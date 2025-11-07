@@ -15,7 +15,7 @@ const page = () => {
       <div className="flex flex-wrap w-full">
         <Card className="w-1/4">
           <CardHeader>
-            <p className="text-accent text-sm">Today's Appointments</p>
+            <p className="text-accent text-sm">Today&apos;s Appointments</p>
                 <h1 className="text-4xl">14</h1>
           </CardHeader>
           <CardContent>
