@@ -16,7 +16,7 @@ const page = () => {
       <div className="flex flex-wrap justify-center mt-5 w-full">
         <Card className="min-w-1/4 m-3">
           <CardHeader>
-            <p className="text-muted-foreground text-sm">Today's Appointments</p>
+            <p className="text-muted-foreground text-sm">Today&apos;s Appointments</p>
             <div className="text-3xl flex justify-start items-center gap-2">
               {" "}
               <ClipboardClock /> 14
