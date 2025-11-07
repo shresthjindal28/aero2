@@ -231,7 +231,6 @@ export default function RecordPage() {
               onClick={async () => {
                 // build a simple PDF with the prescription summary
                 try {
-                  // @ts-expect-error - dynamic import of jspdf; types may not be installed in this workspace
                   const { jsPDF } = await import('jspdf');
                   const doc = new jsPDF();
                   const title = 'Prescription Summary';

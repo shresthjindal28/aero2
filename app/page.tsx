@@ -1,9 +1,12 @@
+import FeaturesSection from '@/components/features-5'
+import HeroSection from '@/components/hero-section'
 import React from 'react'
 
 const page = () => {
   return (
     <div>
-      <h1 className='text-5xl'>Roboto</h1>
+      <HeroSection />
+      <FeaturesSection />
     </div>
   )
 }
