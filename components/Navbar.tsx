@@ -11,9 +11,9 @@ import { Menu } from "lucide-react"; // Icon for mobile menu
 
 const navItems = [
   { href: "/", label: "Home" },
-  { href: "/services", label: "Services" },
-  { href: "/about", label: "About" },
-  { href: "/pricing", label: "Pricing" },
+  { href: "/#services", label: "Services" },
+  { href: "/#about", label: "About" },
+  { href: "/#pricing", label: "Pricing" },
 ];
 
 const Navbar = () => {
@@ -34,7 +34,9 @@ const Navbar = () => {
 
         <div className="hidden md:flex gap-2 mr-1">
           <Button asChild variant="ghost">
-            <Link href="/sign-in">Login</Link>
+            <Link href="/sign-in" className="text-lg py-2 px-3 rounded-md hover:bg-muted">
+              Login
+            </Link>
           </Button>
           <Button asChild className="rounded-full">
             <Link href="/signup">Sign Up</Link>

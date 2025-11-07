@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function FeaturesSection() {
   return (
-    <section className="py-16 md:py-32">
+    <section id="services" className="py-16 md:py-32">
       <div className="mx-auto max-w-6xl px-6">
         <div className="grid items-center gap-12 md:grid-cols-2 md:gap-12 lg:grid-cols-5 lg:gap-24">
           {/* Text Section */}

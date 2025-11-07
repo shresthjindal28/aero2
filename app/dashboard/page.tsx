@@ -1,4 +1,6 @@
 "use client";
+
+import { useUser, UserButton } from "@clerk/nextjs";
 import Header from "@/components/Header";
 import {
   Card,
@@ -79,18 +81,47 @@ const allTranscriptions = [
 ];
 
 const DashboardPage = () => {
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded) return <p className="text-center mt-10">Loading...</p>;
+
   return (
     <div className="w-full min-h-screen p-4 md:p-8 space-y-8">
+      {/* Header Section */}
       <div className="flex justify-between items-center">
-        <Header content={"Dashboard"} className="text-3xl font-bold" />
-        <Link href="/dashboard/transcription" passHref>
-          <Button size="lg" className="bg-green-600 hover:bg-green-700">
-            <Mic className="mr-2 h-5 w-5" />
-            Start Recording
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={user?.imageUrl} alt={user?.firstName || "User"} />
+            <AvatarFallback>
+              {user?.firstName?.[0]}
+              {/* {user?.lastName?.[0]} */}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-2xl font-bold">
+              {user?.firstName ? `${user.firstName}` : "Dashboard"}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Welcome back, {user?.firstName || "Doctor"} 👋
+            </p>
+          </div>
+        </div>
+
+        {/* Clerk User Menu (optional) */}
+        <div className="gap-5 flex items-center justify-between">
+          <Link href="/dashboard/transcription" passHref>
+            {" "}
+            <Button size="lg" className="bg-green-600 hover:bg-green-700">
+              {" "}
+              <Mic className="mr-2 h-5 w-5" /> Start Recording{" "}
+            </Button>{" "}
+          </Link>
+          <UserButton afterSignOutUrl="/" />
+
+        </div>
       </div>
 
+      {/* Main Content */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -104,6 +135,7 @@ const DashboardPage = () => {
             <p className="text-xs text-muted-foreground">4 remaining</p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -116,6 +148,7 @@ const DashboardPage = () => {
             <p className="text-xs text-muted-foreground">-12s from last week</p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -130,6 +163,7 @@ const DashboardPage = () => {
         </Card>
       </div>
 
+      {/* Tabs for Transcriptions */}
       <Tabs defaultValue="all" className="w-full">
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
@@ -207,29 +241,6 @@ const DashboardPage = () => {
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="pending">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Transcriptions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>Table filtered for &quot;Pending&quot; items would go here.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="completed">
-          <Card>
-            <CardHeader>
-              <CardTitle>Completed Transcriptions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>
-                Table filtered for &quot;Completed&quot; items would go here.
-              </p>
             </CardContent>
           </Card>
         </TabsContent>

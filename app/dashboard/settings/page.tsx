@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { SignOutButton } from "@clerk/nextjs";
 
 const SettingsPage = () => {
   return (
@@ -94,6 +95,27 @@ const SettingsPage = () => {
               </Label>
               <Switch id="activity-updates" defaultChecked />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* New Account card with Logout button */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Account</CardTitle>
+            <CardDescription>
+              Manage your account session.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <strong>Sign out</strong>
+              <p className="text-sm text-muted-foreground">
+                Sign out of your account safely.
+              </p>
+            </div>
+            <SignOutButton redirectUrl="/sign-in">
+              <Button variant="outline">Log out</Button>
+            </SignOutButton>
           </CardContent>
         </Card>
 
