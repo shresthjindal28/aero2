@@ -11,7 +11,13 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Mic, StopCircle, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  Mic,
+  StopCircle,
+  AlertTriangle,
+  Loader2,
+  Image as ImageIcon, // 1. Added Image Icon import
+} from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -24,7 +30,7 @@ import { MedicalEntities, OtherEntity } from "@/lib/types";
 const CHUNKS_LENGTH = 10000;
 import { socket } from "@/lib/socket";
 import { useUser } from "@clerk/nextjs";
-
+import dynamic from "next/dynamic";
 
 function norm(s: string): string {
   return s.trim().toLowerCase();
@@ -74,7 +80,7 @@ function mergeEntities(
   };
 }
 
-export default function RecordPage() {
+export function RecordPage() {
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [text, setText] = useState("");
@@ -84,6 +90,19 @@ export default function RecordPage() {
   const [entities, setEntities] = useState<MedicalEntities | null>(null);
   const [soapOpen, setSoapOpen] = useState(false);
   const [soapNote, setSoapNote] = useState("");
+  const [soapGenerating, setSoapGenerating] = useState(false);
+  const [soapError, setSoapError] = useState<string | null>(null);
+  const [soapNotes, setSoapNotes] = useState<{
+    subjective?: string;
+    objective?: string;
+    assessment?: string;
+    plan?: string;
+    image_descriptions?: string;
+  } | null>(null);
+
+  // 2. Added state for image file and sheet
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageOpen, setImageOpen] = useState(false);
 
   const micRef = useRef<MediaRecorder>(null);
   const { user } = useUser();
@@ -172,7 +191,9 @@ export default function RecordPage() {
     <div className="max-w-3xl mx-auto p-4 md:p-8">
       <Header content={"Record Transcription"} className="text-3xl font-bold mb-8" />
 
-      <div className="mb-6">
+      {/* 3. Changed to a grid layout for both buttons */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* --- SOAP Note Button/Sheet --- */}
         <Sheet open={soapOpen} onOpenChange={setSoapOpen}>
           <SheetTrigger asChild>
             <Button size="lg" variant="secondary" className="w-full h-16 text-lg">
@@ -207,6 +228,55 @@ export default function RecordPage() {
                   Close
                 </Button>
                 <Button onClick={() => setSoapOpen(false)}>Save</Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* 4. --- New Image Upload Button/Sheet --- */}
+        <Sheet open={imageOpen} onOpenChange={setImageOpen}>
+          <SheetTrigger asChild>
+            <Button size="lg" variant="secondary" className="w-full h-16 text-lg relative">
+              <ImageIcon className="mr-2 h-5 w-5" />
+              Upload Image (optional)
+              {imageFile && (
+                <span className="absolute top-1 right-1 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                  {imageFile.name.length > 10
+                    ? `${imageFile.name.substring(0, 10)}...`
+                    : imageFile.name}
+                </span>
+              )}
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle>Upload Image</SheetTitle>
+              <SheetDescription>
+                Upload an optional image to accompany the transcription.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="p-4 space-y-4">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setImageFile(file);
+                  if (file) {
+                    setImageOpen(false); // Auto-close on selection
+                  }
+                }}
+                className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
+              />
+              {imageFile && (
+                <div className="text-sm text-green-600">
+                  Selected: <strong>{imageFile.name}</strong>
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setImageOpen(false)}>
+                  Close
+                </Button>
               </div>
             </div>
           </SheetContent>
@@ -309,8 +379,114 @@ export default function RecordPage() {
                   : "—"}
               </p>
             </div>
+            <div className="md:col-span-2">
+              <p className="font-medium text-muted-foreground mb-2">SOAP Notes</p>
+              {soapGenerating ? (
+                <p className="text-muted-foreground">Generating SOAP notes…</p>
+              ) : soapError ? (
+                <p className="text-red-600">{soapError}</p>
+              ) : soapNotes ? (
+                <div className="space-y-2">
+                  {soapNotes.image_descriptions && (
+                    <div>
+                      <p className="font-medium text-muted-foreground">Image Description</p>
+                      <p>{soapNotes.image_descriptions}</p>
+                    </div>
+                  )}
+                  {soapNotes.subjective && (
+                    <div>
+                      <p className="font-medium text-muted-foreground">Subjective</p>
+                      <p>{soapNotes.subjective}</p>
+                    </div>
+                  )}
+                  {soapNotes.objective && (
+                    <div>
+                      <p className="font-medium text-muted-foreground">Objective</p>
+                      <p>{soapNotes.objective}</p>
+                    </div>
+                  )}
+                  {soapNotes.assessment && (
+                    <div>
+                      <p className="font-medium text-muted-foreground">Assessment</p>
+                      <p>{soapNotes.assessment}</p>
+                    </div>
+                  )}
+                  {soapNotes.plan && (
+                    <div>
+                      <p className="font-medium text-muted-foreground">Plan</p>
+                      <p>{soapNotes.plan}</p>
+                    </div>
+                  )}
+                  {!soapNotes.subjective && !soapNotes.objective && !soapNotes.assessment && !soapNotes.plan && (
+                    <p>—</p>
+                  )}
+                </div>
+              ) : (
+                <p>—</p>
+              )}
+            </div>
           </CardContent>
           <div className="p-4 border-t flex justify-end">
+            <Button
+              onClick={async () => {
+                setSoapError(null);
+                if (!text?.trim()) {
+                  setSoapError("No transcription text available.");
+                  return;
+                }
+                setSoapGenerating(true);
+                try {
+                  const fd = new FormData();
+                  fd.append("conversation_text", text);
+                  
+                  // 5. --- MODIFICATION ---
+                  // Add the image to the form data if it exists
+                  if (imageFile) {
+                    fd.append("image", imageFile);
+                  }
+                  // --- END MODIFICATION ---
+
+                  const llmUrl = process.env.NEXT_PUBLIC_LLM_URL;
+                  if (!llmUrl) {
+                    throw new Error("NEXT_PUBLIC_LLM_URL is not configured");
+                  }
+                  const res = await fetch(llmUrl, {
+                    method: "POST",
+                    body: fd,
+                  });
+                  const data = await res.json();
+                  if (!res.ok) {
+                    throw new Error((data && (data as { message?: string }).message) || `Request failed: ${res.status}`);
+                  }
+                  const out = data as {
+                    image_descriptions?: string;
+                    soap_notes?: {
+                      subjective?: string;
+                      objective?: string;
+                      assessment?: string;
+                      plan?: string;
+                    };
+                    status?: string;
+                  };
+                  setSoapNotes({
+                    image_descriptions: out.image_descriptions,
+                    subjective: out.soap_notes?.subjective,
+                    objective: out.soap_notes?.objective,
+                    assessment: out.soap_notes?.assessment,
+                    plan: out.soap_notes?.plan,
+                  });
+                } catch (e: unknown) {
+                  console.error(e);
+                  const msg = e instanceof Error ? e.message : "Failed to generate SOAP notes.";
+                  setSoapError(msg);
+                } finally {
+                  setSoapGenerating(false);
+                }
+              }}
+              variant="secondary"
+            >
+              Generate SOAP Notes
+            </Button>
             <Button
               onClick={async () => {
                 try {
@@ -357,6 +533,13 @@ export default function RecordPage() {
 
                   pushLine("Transcription", text || "—");
 
+                  if (soapNotes) {
+                    pushLine("SOAP Subjective", soapNotes.subjective || "—");
+                    pushLine("SOAP Objective", soapNotes.objective || "—");
+                    pushLine("SOAP Assessment", soapNotes.assessment || "—");
+                    pushLine("SOAP Plan", soapNotes.plan || "—");
+                  }
+
                   doc.save("prescription-summary.pdf");
                 } catch (err) {
                   console.error("Failed to generate PDF", err);
@@ -383,3 +566,4 @@ export default function RecordPage() {
     </div>
   );
 }
+export default dynamic(() => Promise.resolve(RecordPage), { ssr: false });
