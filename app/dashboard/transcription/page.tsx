@@ -8,6 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter, // 1. ADDED: CardFooter import
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,7 +17,7 @@ import {
   StopCircle,
   AlertTriangle,
   Loader2,
-  Image as ImageIcon, // 1. Added Image Icon import
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   Sheet,
@@ -26,12 +27,20 @@ import {
   SheetDescription,
   SheetTrigger,
 } from "@/components/ui/sheet";
+// 2. ADDED: Tab component imports
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { MedicalEntities, OtherEntity } from "@/lib/types";
 const CHUNKS_LENGTH = 10000;
 import { socket } from "@/lib/socket";
 import { useUser } from "@clerk/nextjs";
 import dynamic from "next/dynamic";
 
+// --- Helper functions (no change) ---
 function norm(s: string): string {
   return s.trim().toLowerCase();
 }
@@ -79,8 +88,10 @@ function mergeEntities(
     other: mergeOtherEntities(prev.other, incoming.other),
   };
 }
+// --- End Helper functions ---
 
 export function RecordPage() {
+  // --- State and Refs (no change) ---
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [text, setText] = useState("");
@@ -100,7 +111,6 @@ export function RecordPage() {
     image_descriptions?: string;
   } | null>(null);
 
-  // 2. Added state for image file and sheet
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageOpen, setImageOpen] = useState(false);
 
@@ -108,7 +118,9 @@ export function RecordPage() {
   const { user } = useUser();
   const doctorName = user?.fullName || user?.firstName || user?.username || "Unknown";
   const doctorEmail = user?.primaryEmailAddress?.emailAddress || "Unknown";
+  // --- End State and Refs ---
 
+  // --- useEffect and Listeners (no change) ---
   useEffect(() => {
     socket.on("connect", () => {
       console.log("connected");
@@ -186,14 +198,14 @@ export function RecordPage() {
       setError("Failed to access microphone. Please check browser permissions.");
     }
   };
+  // --- End useEffect and Listeners ---
 
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-8">
       <Header content={"Record Transcription"} className="text-3xl font-bold mb-8" />
 
-      {/* 3. Changed to a grid layout for both buttons */}
+      {/* --- Action Buttons (SOAP SDK & Image Upload) - No Change --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {/* --- SOAP Note Button/Sheet --- */}
         <Sheet open={soapOpen} onOpenChange={setSoapOpen}>
           <SheetTrigger asChild>
             <Button size="lg" variant="secondary" className="w-full h-16 text-lg">
@@ -233,7 +245,6 @@ export function RecordPage() {
           </SheetContent>
         </Sheet>
 
-        {/* 4. --- New Image Upload Button/Sheet --- */}
         <Sheet open={imageOpen} onOpenChange={setImageOpen}>
           <SheetTrigger asChild>
             <Button size="lg" variant="secondary" className="w-full h-16 text-lg relative">
@@ -283,6 +294,7 @@ export function RecordPage() {
         </Sheet>
       </div>
 
+      {/* --- Alerts (Error & Processing) - No Change --- */}
       {error && (
         <Alert variant="destructive" className="mb-6">
           <AlertTriangle className="h-4 w-4" />
@@ -299,6 +311,7 @@ export function RecordPage() {
         </Alert>
       )}
 
+      {/* --- Record Audio Card - No Change --- */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Record Audio</CardTitle>
@@ -330,163 +343,207 @@ export function RecordPage() {
         </CardContent>
       </Card>
 
-      {entities && !processing && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Conversation Summary</CardTitle>
-            <CardDescription>
-              Entities extracted from the transcription.
-              {languageCode && (
-                <span className="block text-xs text-muted-foreground mt-1">Language: {languageCode}</span>
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-            <div className="md:col-span-2">
-              <p className="font-medium text-muted-foreground mb-2">Doctor</p>
-              <p>
-                {String(doctorName)} ({String(doctorEmail)})
-              </p>
-            </div>
-            <div>
-              <p className="font-medium text-muted-foreground mb-2">Symptoms</p>
-              <p>{entities.symptoms?.length ? entities.symptoms.join(", ") : "—"}</p>
-            </div>
-            <div>
-              <p className="font-medium text-muted-foreground mb-2">Medications</p>
-              <p>{entities.medications?.length ? entities.medications.join(", ") : "—"}</p>
-            </div>
-            <div>
-              <p className="font-medium text-muted-foreground mb-2">Diseases</p>
-              <p>{entities.diseases?.length ? entities.diseases.join(", ") : "—"}</p>
-            </div>
-            <div>
-              <p className="font-medium text-muted-foreground mb-2">Procedures</p>
-              <p>{entities.procedures?.length ? entities.procedures.join(", ") : "—"}</p>
-            </div>
-            <div className="md:col-span-2">
-              <p className="font-medium text-muted-foreground mb-2">Other Entities</p>
-              <p>
-                {entities.other?.length
-                  ? entities.other
-                      .map(
-                        (o) =>
-                          `${o.word} (${o.type}${
-                            o.confidence !== undefined ? `, ${Math.round(o.confidence * 100)}%` : ""
-                          })`
-                      )
-                      .join(", ")
-                  : "—"}
-              </p>
-            </div>
-            <div className="md:col-span-2">
-              <p className="font-medium text-muted-foreground mb-2">SOAP Notes</p>
-              {soapGenerating ? (
-                <p className="text-muted-foreground">Generating SOAP notes…</p>
-              ) : soapError ? (
-                <p className="text-red-600">{soapError}</p>
-              ) : soapNotes ? (
-                <div className="space-y-2">
-                  {soapNotes.image_descriptions && (
-                    <div>
-                      <p className="font-medium text-muted-foreground">Image Description</p>
-                      <p>{soapNotes.image_descriptions}</p>
-                    </div>
-                  )}
-                  {soapNotes.subjective && (
-                    <div>
-                      <p className="font-medium text-muted-foreground">Subjective</p>
-                      <p>{soapNotes.subjective}</p>
-                    </div>
-                  )}
-                  {soapNotes.objective && (
-                    <div>
-                      <p className="font-medium text-muted-foreground">Objective</p>
-                      <p>{soapNotes.objective}</p>
-                    </div>
-                  )}
-                  {soapNotes.assessment && (
-                    <div>
-                      <p className="font-medium text-muted-foreground">Assessment</p>
-                      <p>{soapNotes.assessment}</p>
-                    </div>
-                  )}
-                  {soapNotes.plan && (
-                    <div>
-                      <p className="font-medium text-muted-foreground">Plan</p>
-                      <p>{soapNotes.plan}</p>
-                    </div>
-                  )}
-                  {!soapNotes.subjective && !soapNotes.objective && !soapNotes.assessment && !soapNotes.plan && (
-                    <p>—</p>
-                  )}
-                </div>
-              ) : (
-                <p>—</p>
-              )}
-            </div>
-          </CardContent>
-          <div className="p-4 border-t flex justify-end">
-            <Button
-              onClick={async () => {
-                setSoapError(null);
-                if (!text?.trim()) {
-                  setSoapError("No transcription text available.");
-                  return;
-                }
-                setSoapGenerating(true);
-                try {
-                  const fd = new FormData();
-                  fd.append("conversation_text", text);
-                  
-                  // 5. --- MODIFICATION ---
-                  // Add the image to the form data if it exists
-                  if (imageFile) {
-                    fd.append("image", imageFile);
-                  }
-                  // --- END MODIFICATION ---
+      {/* 3. MOVED: Transcription card is now here */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Transcription</CardTitle>
+          <CardDescription>
+            The transcribed text will appear below. You can also edit it manually before generating notes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Textarea value={text} onChange={(e) => setText(e.target.value)} className="h-60" placeholder="Your transcribed text will appear here..." />
+        </CardContent>
+      </Card>
 
-                  const llmUrl = process.env.NEXT_PUBLIC_LLM_URL;
-                  if (!llmUrl) {
-                    throw new Error("NEXT_PUBLIC_LLM_URL is not configured");
-                  }
-                  const res = await fetch(llmUrl, {
-                    method: "POST",
-                    body: fd,
-                  });
-                  const data = await res.json();
-                  if (!res.ok) {
-                    throw new Error((data && (data as { message?: string }).message) || `Request failed: ${res.status}`);
-                  }
-                  const out = data as {
-                    image_descriptions?: string;
-                    soap_notes?: {
-                      subjective?: string;
-                      objective?: string;
-                      assessment?: string;
-                      plan?: string;
-                    };
-                    status?: string;
-                  };
-                  setSoapNotes({
-                    image_descriptions: out.image_descriptions,
-                    subjective: out.soap_notes?.subjective,
-                    objective: out.soap_notes?.objective,
-                    assessment: out.soap_notes?.assessment,
-                    plan: out.soap_notes?.plan,
-                  });
-                } catch (e: unknown) {
-                  console.error(e);
-                  const msg = e instanceof Error ? e.message : "Failed to generate SOAP notes.";
-                  setSoapError(msg);
-                } finally {
-                  setSoapGenerating(false);
-                }
-              }}
-              variant="secondary"
-            >
-              Generate SOAP Notes
-            </Button>
+      {/* 4. REFACTORED: Results section now uses Tabs */}
+      {entities && !processing && (
+        <>
+          <Tabs defaultValue="summary" className="mb-8">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="summary">Extracted Entities</TabsTrigger>
+              <TabsTrigger value="soap">SOAP Note</TabsTrigger>
+            </TabsList>
+
+            {/* --- Tab 1: Extracted Entities --- */}
+            <TabsContent value="summary">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Conversation Summary</CardTitle>
+                  <CardDescription>
+                    Entities extracted from the transcription.
+                    {languageCode && (
+                      <span className="block text-xs text-muted-foreground mt-1">Language: {languageCode}</span>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                  <div className="md:col-span-2">
+                    <p className="font-medium text-muted-foreground mb-2">Doctor</p>
+                    <p>
+                      {String(doctorName)} ({String(doctorEmail)})
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-muted-foreground mb-2">Symptoms</p>
+                    <p>{entities.symptoms?.length ? entities.symptoms.join(", ") : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-muted-foreground mb-2">Medications</p>
+                    <p>{entities.medications?.length ? entities.medications.join(", ") : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-muted-foreground mb-2">Diseases</p>
+                    <p>{entities.diseases?.length ? entities.diseases.join(", ") : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-muted-foreground mb-2">Procedures</p>
+                    <p>{entities.procedures?.length ? entities.procedures.join(", ") : "—"}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="font-medium text-muted-foreground mb-2">Other Entities</p>
+                    <p>
+                      {entities.other?.length
+                        ? entities.other
+                            .map(
+                              (o) =>
+                                `${o.word} (${o.type}${
+                                  o.confidence !== undefined ? `, ${Math.round(o.confidence * 100)}%` : ""
+                                })`
+                            )
+                            .join(", ")
+                        : "—"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* --- Tab 2: SOAP Note --- */}
+            <TabsContent value="soap">
+              <Card>
+                <CardHeader>
+                  <CardTitle>SOAP Note</CardTitle>
+                  <CardDescription>
+                    Generate a SOAP note from the transcription and optional image.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {soapGenerating ? (
+                    <div className="flex items-center space-x-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Generating SOAP notes…</span>
+                    </div>
+                  ) : soapError ? (
+                    <p className="text-red-600">{soapError}</p>
+                  ) : soapNotes ? (
+                    <div className="space-y-4 text-sm">
+                      {soapNotes.image_descriptions && (
+                        <div>
+                          <p className="font-medium text-muted-foreground">Image Description</p>
+                          <p className="whitespace-pre-wrap">{soapNotes.image_descriptions}</p>
+                        </div>
+                      )}
+                      {soapNotes.subjective && (
+                        <div>
+                          <p className="font-medium text-muted-foreground">Subjective</p>
+                          <p className="whitespace-pre-wrap">{soapNotes.subjective}</p>
+                        </div>
+                      )}
+                      {soapNotes.objective && (
+                        <div>
+                          <p className="font-medium text-muted-foreground">Objective</p>
+                          <p className="whitespace-pre-wrap">{soapNotes.objective}</p>
+                        </div>
+                      )}
+                      {soapNotes.assessment && (
+                        <div>
+                          <p className="font-medium text-muted-foreground">Assessment</p>
+                          <p className="whitespace-pre-wrap">{soapNotes.assessment}</p>
+                        </div>
+                      )}
+                      {soapNotes.plan && (
+                        <div>
+                          <p className="font-medium text-muted-foreground">Plan</p>
+                          <p className="whitespace-pre-wrap">{soapNotes.plan}</p>
+                        </div>
+                      )}
+                      {!soapNotes.subjective && !soapNotes.objective && !soapNotes.assessment && !soapNotes.plan && (
+                        <p>—</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Click &ldquo;Generate SOAP Notes&quot; to create a note from the transcription.
+                    </p>
+                  )}
+                </CardContent>
+                {/* 5. MOVED: Generate button is now in the footer of its tab card */}
+                <CardFooter className="flex justify-end">
+                  <Button
+                    onClick={async () => {
+                      setSoapError(null);
+                      if (!text?.trim()) {
+                        setSoapError("No transcription text available.");
+                        return;
+                      }
+                      setSoapGenerating(true);
+                      try {
+                        const fd = new FormData();
+                        fd.append("conversation_text", text);
+                        if (imageFile) {
+                          fd.append("image", imageFile);
+                        }
+
+                        const llmUrl = process.env.NEXT_PUBLIC_LLM_URL;
+                        if (!llmUrl) {
+                          throw new Error("NEXT_PUBLIC_LLM_URL is not configured");
+                        }
+                        const res = await fetch(llmUrl, {
+                          method: "POST",
+                          body: fd,
+                        });
+                        const data = await res.json();
+                        if (!res.ok) {
+                          throw new Error((data && (data as { message?: string }).message) || `Request failed: ${res.status}`);
+                        }
+                        const out = data as {
+                          image_descriptions?: string;
+                          soap_notes?: {
+                            subjective?: string;
+                            objective?: string;
+                            assessment?: string;
+                            plan?: string;
+                          };
+                          status?: string;
+                        };
+                        setSoapNotes({
+                          image_descriptions: out.image_descriptions,
+                          subjective: out.soap_notes?.subjective,
+                          objective: out.soap_notes?.objective,
+                          assessment: out.soap_notes?.assessment,
+                          plan: out.soap_notes?.plan,
+                        });
+                      } catch (e: unknown) {
+                        console.error(e);
+                        const msg = e instanceof Error ? e.message : "Failed to generate SOAP notes.";
+                        setSoapError(msg);
+                      } finally {
+                        setSoapGenerating(false);
+                      }
+                    }}
+                    variant="secondary"
+                    disabled={soapGenerating}
+                  >
+                    {soapGenerating ? "Generating..." : "Generate SOAP Notes"}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* 6. MOVED: Download button is now a final action at the bottom */}
+          <div className="flex justify-end">
             <Button
               onClick={async () => {
                 try {
@@ -500,24 +557,45 @@ export function RecordPage() {
                   let y = 34;
 
                   const pushLine = (label: string, value: string) => {
-                    const lines = doc.splitTextToSize(`${label}: ${value}`, 180);
-                    doc.text(lines, 14, y);
-                    y += lines.length * 7;
+                    doc.setFont("helvetica", "bold");
+                    doc.text(label, 14, y);
+                    doc.setFont("helvetica", "normal");
+                    const lines = doc.splitTextToSize(value, 150); // Indent value
+                    doc.text(lines, 30, y + 6);
+                    y += (lines.length + 1) * 7; // Add spacing
                     if (y > 280) {
                       doc.addPage();
                       y = 20;
                     }
                   };
+                  
+                  // Simplified pushLine for long text
+                  const pushBlock = (label: string, value: string) => {
+                     doc.setFont("helvetica", "bold");
+                    doc.text(label, 14, y);
+                    y += 7;
+                    doc.setFont("helvetica", "normal");
+                    const lines = doc.splitTextToSize(value, 180);
+                    doc.text(lines, 14, y);
+                    y += lines.length * 7 + 4; // Add spacing
+                    if (y > 280) {
+                      doc.addPage();
+                      y = 20;
+                    }
+                  }
 
                   pushLine("Doctor Name", String(doctorName));
                   pushLine("Doctor Email", String(doctorEmail));
+                  y += 5; // Section break
+                  
+                  doc.line(14, y - 2, 196, y-2); // horizontal line
 
                   pushLine("Language", languageCode || "Unknown");
                   pushLine("Symptoms", entities.symptoms?.length ? entities.symptoms.join(", ") : "—");
                   pushLine("Medications", entities.medications?.length ? entities.medications.join(", ") : "—");
                   pushLine("Diseases", entities.diseases?.length ? entities.diseases.join(", ") : "—");
                   pushLine("Procedures", entities.procedures?.length ? entities.procedures.join(", ") : "—");
-
+                  
                   const otherString =
                     entities.other?.length
                       ? entities.other
@@ -530,15 +608,21 @@ export function RecordPage() {
                           .join(", ")
                       : "—";
                   pushLine("Other Entities", otherString);
-
-                  pushLine("Transcription", text || "—");
-
+                  
+                  y += 5;
+                  doc.line(14, y - 2, 196, y-2); // horizontal line
+                  
                   if (soapNotes) {
-                    pushLine("SOAP Subjective", soapNotes.subjective || "—");
-                    pushLine("SOAP Objective", soapNotes.objective || "—");
-                    pushLine("SOAP Assessment", soapNotes.assessment || "—");
-                    pushLine("SOAP Plan", soapNotes.plan || "—");
+                    pushBlock("SOAP Subjective", soapNotes.subjective || "—");
+                    pushBlock("SOAP Objective", soapNotes.objective || "—");
+                    pushBlock("SOAP Assessment", soapNotes.assessment || "—");
+                    pushBlock("SOAP Plan", soapNotes.plan || "—");
                   }
+                  
+                  y += 5;
+                  doc.line(14, y - 2, 196, y-2); // horizontal line
+
+                  pushBlock("Full Transcription", text || "—");
 
                   doc.save("prescription-summary.pdf");
                 } catch (err) {
@@ -547,22 +631,15 @@ export function RecordPage() {
                 }
               }}
               className="ml-2"
+              size="lg"
             >
               Download Prescription (PDF)
             </Button>
           </div>
-        </Card>
+        </>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Transcription</CardTitle>
-          <CardDescription>The transcribed text will appear below.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Textarea value={text} onChange={(e) => setText(e.target.value)} className="h-80" placeholder="Your transcribed text will appear here..." />
-        </CardContent>
-      </Card>
+      {/* 7. REMOVED: Old monolithic card and transcription card are gone from here */}
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/utils/supabaseClient";
+import Link from "next/link";
 
 interface TranscriptRow {
   id: number;
@@ -57,11 +58,17 @@ export default async function Page() {
             <TableBody>
               {transcripts.map((t) => (
                 <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.id}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link href={`/dashboard/recordings/${t.id}`} className="hover:underline">
+                      {t.id}
+                    </Link>
+                  </TableCell>
                   <TableCell title={t.conversation_text}>
-                    {t.conversation_text?.length > 140
-                      ? `${t.conversation_text.slice(0, 140)}…`
-                      : t.conversation_text}
+                    <Link href={`/dashboard/recordings/${t.id}`} className="hover:underline">
+                      {t.conversation_text?.length > 140
+                        ? `${t.conversation_text.slice(0, 140)}…`
+                        : t.conversation_text}
+                    </Link>
                   </TableCell>
                   <TableCell>{new Date(t.created_at).toLocaleString()}</TableCell>
                 </TableRow>
