@@ -8,6 +8,7 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import { Menu } from "lucide-react"; // Icon for mobile menu
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 
 const navItems = [
   { href: "/", label: "Home" },
@@ -32,17 +33,28 @@ const Navbar = () => {
           ))}
         </div>
 
+        {/* Desktop auth actions */}
         <div className="hidden md:flex gap-2 mr-1">
-          <Button asChild variant="ghost">
-            <Link href="/sign-in" className="text-lg py-2 px-3 rounded-md hover:bg-muted">
-              Login
-            </Link>
-          </Button>
-          <Button asChild className="rounded-full">
-            <Link href="/signup">Sign Up</Link>
-          </Button>
+          <SignedOut>
+            <Button asChild variant="ghost">
+              <Link href="/sign-in" className="text-lg py-2 px-3 rounded-md hover:bg-muted">
+                Login
+              </Link>
+            </Button>
+            <Button asChild className="rounded-full">
+              <Link href="/signup">Sign Up</Link>
+            </Button>
+          </SignedOut>
+          <SignedIn>
+            <Button asChild className="rounded-full">
+              <Link href="/dashboard" className="text-lg py-2 px-3 rounded-md hover:bg-muted">
+                Dashboard
+              </Link>
+            </Button>
+          </SignedIn>
         </div>
 
+        {/* Mobile menu */}
         <div className="md:hidden">
           <Sheet>
             <SheetTrigger asChild>
@@ -66,20 +78,29 @@ const Navbar = () => {
 
                 <hr className="border-border my-4" />
 
-                <SheetClose asChild>
-                  <Button
-                    asChild
-                    variant="ghost"
-                    className="justify-start text-lg py-2 px-3"
-                  >
-                    <Link href="/login">Login</Link>
-                  </Button>
-                </SheetClose>
-                <SheetClose asChild>
-                  <Button asChild className="justify-start text-lg py-2 px-3">
-                    <Link href="/signup">Sign Up</Link>
-                  </Button>
-                </SheetClose>
+                <SignedOut>
+                  <SheetClose asChild>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      className="justify-start text-lg py-2 px-3"
+                    >
+                      <Link href="/sign-in">Login</Link>
+                    </Button>
+                  </SheetClose>
+                  <SheetClose asChild>
+                    <Button asChild className="justify-start text-lg py-2 px-3">
+                      <Link href="/signup">Sign Up</Link>
+                    </Button>
+                  </SheetClose>
+                </SignedOut>
+                <SignedIn>
+                  <SheetClose asChild>
+                    <Button asChild className="justify-start text-lg py-2 px-3">
+                      <Link href="/dashboard">Dashboard</Link>
+                    </Button>
+                  </SheetClose>
+                </SignedIn>
               </div>
             </SheetContent>
           </Sheet>

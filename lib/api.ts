@@ -15,8 +15,8 @@ export async function processAudioFile(file: File): Promise<ProcessAudioResult> 
   }
 
   if (!res.ok) {
-    const msg = (data && data.message) || `Backend error: ${res.status}`;
-    throw new Error(msg);
+    const msg = (data && typeof data === 'object' && 'message' in data && (data as { message?: string }).message) || `Backend error: ${res.status}`;
+    throw new Error(String(msg));
   }
 
   return data as ProcessAudioResult;
