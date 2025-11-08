@@ -130,6 +130,7 @@ export default function RecordPage() {
       mic.addEventListener("dataavailable", micDataListner);
       mic.addEventListener("stop", micStopListner);
     } catch (error) {
+      setRecording(false);
       console.log(error);
     }
   };
