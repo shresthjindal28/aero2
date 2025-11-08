@@ -99,7 +99,7 @@ interface DifferentialResponse {
   red_flags?: string[];
 }
 
-export function RecordPage() {
+function RecordPage() {
   // --- State and Refs (no change) ---
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
