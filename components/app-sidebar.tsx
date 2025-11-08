@@ -28,6 +28,11 @@ const items = [
     url: "/dashboard/transcription",
     icon: Calendar,
   },
+  {
+    title: "Soap Notes",
+    url: "/dashboard/SOAP-notes",
+    icon: Search,
+  },
   // {
   //   title: "Settings",
   //   url: "/dashboard/settings",
