@@ -85,12 +85,30 @@ function mergeEntities(
 }
 // --- End Helper functions ---
 
+interface DifferentialDiagnosis {
+  diagnosis: string;
+  likelihood: string;
+  reasoning: string;
+  supporting_evidence: string;
+}
+
+interface DifferentialResponse {
+  primary_suspected_diagnosis?: string;
+  differential_diagnoses?: DifferentialDiagnosis[];
+  additional_tests?: string[];
+  red_flags?: string[];
+}
+
 export function RecordPage() {
   // --- State and Refs (no change) ---
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [soapGen, setSoapGen] = useState(false);
+  // const [differentials, setdifferentials] = useState<unknown>();
+  const [differentials, setdifferentials] = useState<DifferentialResponse | null>(null);
+  const [gettingSugg, setGettingSugg] = useState(false);
 
   const [languageCode, setLanguageCode] = useState<string | null>(null);
   const [entities, setEntities] = useState<MedicalEntities | null>(null);
@@ -271,7 +289,6 @@ export function RecordPage() {
                 accept="image/*"
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
-                  console.log(file);
 
                   setImageFile(file);
                   if (file) {
@@ -515,73 +532,124 @@ export function RecordPage() {
                   )}
                 </CardContent>
                 {/* 5. MOVED: Generate button is now in the footer of its tab card */}
-                <CardFooter className="flex justify-end">
-                  <Button
-                    onClick={async () => {
-                      setSoapError(null);
-                      if (!text?.trim()) {
-                        setSoapError("No transcription text available.");
-                        return;
-                      }
-                      setSoapGenerating(true);
-                      try {
-                        const fd = new FormData();
-                        fd.append("conversation_text", text);
-                        if (imageFile) {
-                          fd.append("images", imageFile);
+
+                <CardFooter className="flex gap-3 justify-end">
+                  {!soapGen ? (
+                    <Button
+                      onClick={async () => {
+                        setSoapError(null);
+                        if (!text?.trim()) {
+                          setSoapError("No transcription text available.");
+                          return;
                         }
-                        const llmUrl = process.env.NEXT_PUBLIC_LLM_URL;
-                        if (!llmUrl) {
-                          throw new Error("NEXT_PUBLIC_LLM_URL is not configured");
-                        }
-                        const res = await fetch(llmUrl, {
-                          method: "POST",
-                          body: fd,
-                        });
-                        const data = await res.json();
-                        if (!res.ok) {
-                          throw new Error(
-                            (data && (data as { message?: string }).message) ||
-                              `Request failed: ${res.status}`
-                          );
-                        }
-                        const out = data as {
-                          image_descriptions?: string;
-                          soap_notes?: {
-                            subjective?: string;
-                            objective?: string;
-                            assessment?: string;
-                            plan?: string;
+                        setSoapGenerating(true);
+                        try {
+                          const fd = new FormData();
+                          fd.append("conversation_text", text);
+                          if (imageFile) {
+                            fd.append("images", imageFile);
+                          }
+                          const llmUrl = process.env.NEXT_PUBLIC_LLM_URL;
+                          if (!llmUrl) {
+                            throw new Error("NEXT_PUBLIC_LLM_URL is not configured");
+                          }
+                          const res = await fetch(llmUrl, {
+                            method: "POST",
+                            body: fd,
+                          });
+                          const data = await res.json();
+                          if (!res.ok) {
+                            throw new Error(
+                              (data && (data as { message?: string }).message) ||
+                                `Request failed: ${res.status}`
+                            );
+                          }
+                          const out = data as {
+                            image_descriptions?: string;
+                            soap_notes?: {
+                              subjective?: string;
+                              objective?: string;
+                              assessment?: string;
+                              plan?: string;
+                            };
+                            status?: string;
                           };
-                          status?: string;
-                        };
-                        setSoapNotes({
-                          image_descriptions: out.image_descriptions,
-                          subjective: out.soap_notes?.subjective,
-                          objective: out.soap_notes?.objective,
-                          assessment: out.soap_notes?.assessment,
-                          plan: out.soap_notes?.plan,
-                        });
-                      } catch (e: unknown) {
-                        console.error(e);
-                        const msg =
-                          e instanceof Error
-                            ? e.message
-                            : "Failed to generate SOAP notes.";
-                        setSoapError(msg);
-                      } finally {
-                        setSoapGenerating(false);
-                      }
-                    }}
-                    variant="secondary"
-                    disabled={soapGenerating}
-                  >
-                    {soapGenerating ? "Generating..." : "Generate SOAP Notes"}
-                  </Button>
+                          setSoapNotes({
+                            image_descriptions: out.image_descriptions,
+                            subjective: out.soap_notes?.subjective,
+                            objective: out.soap_notes?.objective,
+                            assessment: out.soap_notes?.assessment,
+                            plan: out.soap_notes?.plan,
+                          });
+                          setSoapGen(true);
+                        } catch (e: unknown) {
+                          console.error(e);
+                          const msg =
+                            e instanceof Error
+                              ? e.message
+                              : "Failed to generate SOAP notes.";
+                          setSoapError(msg);
+                        } finally {
+                          setSoapGenerating(false);
+                        }
+                      }}
+                      variant="secondary"
+                      disabled={soapGenerating}
+                    >
+                      {soapGenerating ? "Generating..." : "Generate SOAP Notes"}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        onClick={async () => {
+                          setGettingSugg(true);
+                          const res = await fetch(
+                            "https://med-llm.onrender.com/generate-differentials",
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ soap_notes: soapNotes }),
+                            }
+                          );
+                          const data: DifferentialResponse = await res.json();
+                          if (!res.ok) {
+                            throw new Error(
+                              (data && (data as { message?: string }).message) ||
+                                `Request failed: ${res.status}`
+                            );
+                          }
+                          console.log(data);
+
+                          setdifferentials(data);
+                          setGettingSugg(false);
+                        }}
+                        variant="outline"
+                        disabled={gettingSugg}
+                      >
+                        {gettingSugg ? "Generating..." : "Get Suggestions"}
+                      </Button>
+                      <Button variant={"outline"}>Give Feedback</Button>
+                    </>
+                  )}
                 </CardFooter>
               </Card>
             </TabsContent>
           </Tabs>
+          {differentials?.differential_diagnoses?.length ? (
+            <ul className="list-disc ml-5 space-y-2">
+              {differentials.differential_diagnoses.map((d, i) => (
+                <li key={i}>
+                  <p>
+                    <strong>{d.diagnosis}</strong> ({d.likelihood})
+                  </p>
+                  <p className="text-muted-foreground">{d.reasoning}</p>
+                  <p className="italic">Evidence: {d.supporting_evidence}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>—</p>
+          )}
 
           {/* 6. MOVED: Download button is now a final action at the bottom */}
           <div className="flex justify-end">
