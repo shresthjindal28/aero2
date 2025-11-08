@@ -604,7 +604,7 @@ export function RecordPage() {
                         onClick={async () => {
                           setGettingSugg(true);
                           const res = await fetch(
-                            "https://med-llm.onrender.com/generate-differentials",
+                            process.env.NEXT_PUBLIC_DIFFERENTIAL_URL || "",
                             {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
@@ -633,24 +633,80 @@ export function RecordPage() {
                   )}
                 </CardFooter>
               </Card>
+              {differentials && (
+                <Card className="mt-4">
+                  <CardHeader>
+                    <CardTitle>AI Suggestions</CardTitle>
+                    <CardDescription>Based on your generated SOAP notes</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {differentials.primary_suspected_diagnosis && (
+                      <div>
+                        <h4 className="text-sm font-medium">Primary suspected diagnosis</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {differentials.primary_suspected_diagnosis}
+                        </p>
+                      </div>
+                    )}
+
+                    {Array.isArray(differentials.differential_diagnoses) &&
+                      differentials.differential_diagnoses.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium">Differential diagnoses</h4>
+                          <div className="mt-2 space-y-3">
+                            {differentials.differential_diagnoses.map((d, idx) => (
+                              <div key={idx} className="rounded-md border p-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium">{d.diagnosis}</span>
+                                  {d.likelihood && (
+                                    <span className="text-xs text-muted-foreground">{d.likelihood}</span>
+                                  )}
+                                </div>
+                                {d.reasoning && (
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    Reasoning: {d.reasoning}
+                                  </p>
+                                )}
+                                {d.supporting_evidence && (
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    Evidence: {d.supporting_evidence}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {Array.isArray(differentials.additional_tests) &&
+                      differentials.additional_tests.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium">Recommended tests</h4>
+                          <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
+                            {differentials.additional_tests.map((t, idx) => (
+                              <li key={idx}>{t}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                    {Array.isArray(differentials.red_flags) &&
+                      differentials.red_flags.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-red-600">Red flags</h4>
+                          <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
+                            {differentials.red_flags.map((r, idx) => (
+                              <li key={idx}>{r}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           </Tabs>
-          {differentials?.differential_diagnoses?.length ? (
-            <ul className="list-disc ml-5 space-y-2">
-              {differentials.differential_diagnoses.map((d, i) => (
-                <li key={i}>
-                  <p>
-                    <strong>{d.diagnosis}</strong> ({d.likelihood})
-                  </p>
-                  <p className="text-muted-foreground">{d.reasoning}</p>
-                  <p className="italic">Evidence: {d.supporting_evidence}</p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>—</p>
-          )}
-
+          
           {/* 6. MOVED: Download button is now a final action at the bottom */}
           <div className="flex justify-end">
             <Button
