@@ -8,7 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter, // 1. ADDED: CardFooter import
+  CardFooter,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -27,7 +27,6 @@ import {
   SheetDescription,
   SheetTrigger,
 } from "@/components/ui/sheet";
-// 2. ADDED: Tab component imports
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MedicalEntities, OtherEntity } from "@/lib/types";
 const CHUNKS_LENGTH = 10000;
@@ -106,7 +105,6 @@ function RecordPage() {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [soapGen, setSoapGen] = useState(false);
-  // const [differentials, setdifferentials] = useState<unknown>();
   const [differentials, setdifferentials] = useState<DifferentialResponse | null>(null);
   const [gettingSugg, setGettingSugg] = useState(false);
 
@@ -213,6 +211,153 @@ function RecordPage() {
   };
   // --- End useEffect and Listeners ---
 
+  // --- Helper: generate a clean, paginated PDF report ---
+  const downloadPrescriptionPDF = async () => {
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const marginLeft = 40;
+      const marginRight = 40;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const usableWidth = pageWidth - marginLeft - marginRight;
+      let y = 60;
+
+      const addHeader = () => {
+        const title = "SOAP Note Report";
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.text(title, pageWidth / 2, 30, { align: "center" });
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        const now = new Date();
+        doc.text(`Date: ${now.toLocaleString()}`, marginLeft, 48);
+        doc.text(`Doctor: ${String(doctorName)}`, pageWidth - marginRight - 180, 48);
+        doc.text(`Email: ${String(doctorEmail)}`, pageWidth - marginRight - 180, 62);
+        y = 80;
+        doc.setLineWidth(0.5);
+        doc.line(marginLeft, y - 10, pageWidth - marginRight, y - 10);
+        y += 8;
+      };
+
+      const ensureSpace = (needed = 80) => {
+        const pageHeight = doc.internal.pageSize.getHeight();
+        if (y + needed > pageHeight - 40) {
+          doc.addPage();
+          y = 60;
+        }
+      };
+
+      const addSection = (heading: string, content?: string) => {
+        ensureSpace(40);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text(heading, marginLeft, y);
+        y += 16;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        const text = content && content.trim() ? content : "—";
+        const lines = doc.splitTextToSize(text, usableWidth);
+        doc.text(lines, marginLeft, y);
+        y += lines.length * 14 + 10;
+      };
+
+      const addBulletList = (heading: string, items?: string[]) => {
+        ensureSpace(30);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text(heading, marginLeft, y);
+        y += 14;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        if (!items || items.length === 0) {
+          doc.text("—", marginLeft, y);
+          y += 16;
+          return;
+        }
+        for (const item of items) {
+          ensureSpace(30);
+          const lines = doc.splitTextToSize(item, usableWidth - 20);
+          doc.text("• " + lines[0], marginLeft + 6, y);
+          y += 14;
+          if (lines.length > 1) {
+            doc.text(lines.slice(1), marginLeft + 20, y - 2);
+            y += (lines.length - 1) * 14;
+          }
+        }
+        y += 8;
+      };
+
+      // Build PDF
+      addHeader();
+
+      addSection("Language", languageCode || "Unknown");
+      addSection("Full Transcription", text || "—");
+
+      if (soapNotes) {
+        doc.setLineWidth(0.5);
+        doc.line(marginLeft, y - 6, pageWidth - marginRight, y - 6);
+        y += 8;
+
+        addSection("SOAP - Subjective", soapNotes.subjective || "—");
+        addSection("SOAP - Objective", soapNotes.objective || "—");
+        addSection("SOAP - Assessment", soapNotes.assessment || "—");
+        addSection("SOAP - Plan", soapNotes.plan || "—");
+      }
+
+      // AI Suggestions
+      if (differentials) {
+        doc.setLineWidth(0.5);
+        doc.line(marginLeft, y - 6, pageWidth - marginRight, y - 6);
+        y += 8;
+
+        addSection(
+          "Primary Suspected Diagnosis",
+          differentials.primary_suspected_diagnosis || "—"
+        );
+
+        // Differential diagnoses (detailed)
+        ensureSpace(30);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text("Differential Diagnoses", marginLeft, y);
+        y += 16;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        if (Array.isArray(differentials.differential_diagnoses) && differentials.differential_diagnoses.length > 0) {
+          differentials.differential_diagnoses.forEach((d, i) => {
+            ensureSpace(40);
+            const block = `${i + 1}. ${d.diagnosis} (${d.likelihood || "—"})\nReasoning: ${d.reasoning || "—"}\nEvidence: ${d.supporting_evidence || "—"}`;
+            const lines = doc.splitTextToSize(block, usableWidth);
+            doc.text(lines, marginLeft, y);
+            y += lines.length * 14 + 8;
+          });
+        } else {
+          doc.text("—", marginLeft, y);
+          y += 16;
+        }
+
+        // Recommended tests & red flags
+        addBulletList("Recommended Tests", differentials.additional_tests);
+        addBulletList("Red Flags", differentials.red_flags);
+      }
+
+      // Footer note
+      ensureSpace(40);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "italic");
+      doc.text(
+        "Generated by RunAnywhere SDK - review clinical content before use.",
+        marginLeft,
+        doc.internal.pageSize.getHeight() - 30
+      );
+
+      doc.save(`SOAP_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      console.error("Failed to generate PDF", err);
+      setError("Failed to generate PDF.");
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-8">
       <Header content={"Record Transcription"} className="text-3xl font-bold mb-8" />
@@ -289,7 +434,6 @@ function RecordPage() {
                 accept="image/*"
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
-
                   setImageFile(file);
                   if (file) {
                     setImageOpen(false); // Auto-close on selection
@@ -368,7 +512,7 @@ function RecordPage() {
         </CardContent>
       </Card>
 
-      {/* 3. MOVED: Transcription card is now here */}
+      {/* Transcription */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Transcription</CardTitle>
@@ -387,7 +531,7 @@ function RecordPage() {
         </CardContent>
       </Card>
 
-      {/* 4. REFACTORED: Results section now uses Tabs */}
+      {/* Results Tabs (shown when entities available) */}
       {entities && !processing && (
         <>
           <Tabs defaultValue="summary" className="mb-8">
@@ -396,7 +540,6 @@ function RecordPage() {
               <TabsTrigger value="soap">SOAP Note</TabsTrigger>
             </TabsList>
 
-            {/* --- Tab 1: Extracted Entities --- */}
             <TabsContent value="summary">
               <Card>
                 <CardHeader>
@@ -466,7 +609,6 @@ function RecordPage() {
               </Card>
             </TabsContent>
 
-            {/* --- Tab 2: SOAP Note --- */}
             <TabsContent value="soap">
               <Card>
                 <CardHeader>
@@ -531,7 +673,6 @@ function RecordPage() {
                     </p>
                   )}
                 </CardContent>
-                {/* 5. MOVED: Generate button is now in the footer of its tab card */}
 
                 <CardFooter className="flex gap-3 justify-end">
                   {!soapGen ? (
@@ -603,25 +744,30 @@ function RecordPage() {
                       <Button
                         onClick={async () => {
                           setGettingSugg(true);
-                          const res = await fetch(
-                            process.env.NEXT_PUBLIC_DIFFERENTIAL_URL || "",
-                            {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ soap_notes: soapNotes }),
-                            }
-                          );
-                          const data: DifferentialResponse = await res.json();
-                          if (!res.ok) {
-                            throw new Error(
-                              (data && (data as { message?: string }).message) ||
-                                `Request failed: ${res.status}`
+                          try {
+                            const res = await fetch(
+                              process.env.NEXT_PUBLIC_DIFFERENTIAL_URL || "",
+                              {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ soap_notes: soapNotes }),
+                              }
                             );
+                            const data: DifferentialResponse = await res.json();
+                            if (!res.ok) {
+                              throw new Error(
+                                (data && (data as { message?: string }).message) ||
+                                  `Request failed: ${res.status}`
+                              );
+                            }
+                            console.log("Differential response:", data);
+                            setdifferentials(data);
+                          } catch (err) {
+                            console.error("Failed to get suggestions", err);
+                            setError("Failed to get suggestions.");
+                          } finally {
+                            setGettingSugg(false);
                           }
-                          console.log(data);
-
-                          setdifferentials(data);
-                          setGettingSugg(false);
                         }}
                         variant="outline"
                         disabled={gettingSugg}
@@ -633,191 +779,93 @@ function RecordPage() {
                   )}
                 </CardFooter>
               </Card>
-              {differentials && (
-                <Card className="mt-4">
-                  <CardHeader>
-                    <CardTitle>AI Suggestions</CardTitle>
-                    <CardDescription>Based on your generated SOAP notes</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {differentials.primary_suspected_diagnosis && (
-                      <div>
-                        <h4 className="text-sm font-medium">Primary suspected diagnosis</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {differentials.primary_suspected_diagnosis}
-                        </p>
-                      </div>
-                    )}
-
-                    {Array.isArray(differentials.differential_diagnoses) &&
-                      differentials.differential_diagnoses.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium">Differential diagnoses</h4>
-                          <div className="mt-2 space-y-3">
-                            {differentials.differential_diagnoses.map((d, idx) => (
-                              <div key={idx} className="rounded-md border p-3">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-medium">{d.diagnosis}</span>
-                                  {d.likelihood && (
-                                    <span className="text-xs text-muted-foreground">{d.likelihood}</span>
-                                  )}
-                                </div>
-                                {d.reasoning && (
-                                  <p className="mt-1 text-sm text-muted-foreground">
-                                    Reasoning: {d.reasoning}
-                                  </p>
-                                )}
-                                {d.supporting_evidence && (
-                                  <p className="mt-1 text-sm text-muted-foreground">
-                                    Evidence: {d.supporting_evidence}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                    {Array.isArray(differentials.additional_tests) &&
-                      differentials.additional_tests.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium">Recommended tests</h4>
-                          <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
-                            {differentials.additional_tests.map((t, idx) => (
-                              <li key={idx}>{t}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                    {Array.isArray(differentials.red_flags) &&
-                      differentials.red_flags.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium text-red-600">Red flags</h4>
-                          <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
-                            {differentials.red_flags.map((r, idx) => (
-                              <li key={idx}>{r}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                  </CardContent>
-                </Card>
-              )}
             </TabsContent>
           </Tabs>
-          
-          {/* 6. MOVED: Download button is now a final action at the bottom */}
-          <div className="flex justify-end">
-            <Button
-              onClick={async () => {
-                try {
-                  const { jsPDF } = await import("jspdf");
-                  const doc = new jsPDF();
-                  const title = "Prescription Summary";
-                  doc.setFontSize(18);
-                  doc.text(title, 14, 20);
-
-                  doc.setFontSize(12);
-                  let y = 34;
-
-                  const pushLine = (label: string, value: string) => {
-                    doc.setFont("helvetica", "bold");
-                    doc.text(label, 14, y);
-                    doc.setFont("helvetica", "normal");
-                    const lines = doc.splitTextToSize(value, 150); // Indent value
-                    doc.text(lines, 30, y + 6);
-                    y += (lines.length + 1) * 7; // Add spacing
-                    if (y > 280) {
-                      doc.addPage();
-                      y = 20;
-                    }
-                  };
-
-                  // Simplified pushLine for long text
-                  const pushBlock = (label: string, value: string) => {
-                    doc.setFont("helvetica", "bold");
-                    doc.text(label, 14, y);
-                    y += 7;
-                    doc.setFont("helvetica", "normal");
-                    const lines = doc.splitTextToSize(value, 180);
-                    doc.text(lines, 14, y);
-                    y += lines.length * 7 + 4; // Add spacing
-                    if (y > 280) {
-                      doc.addPage();
-                      y = 20;
-                    }
-                  };
-
-                  pushLine("Doctor Name", String(doctorName));
-                  pushLine("Doctor Email", String(doctorEmail));
-                  y += 5; // Section break
-
-                  doc.line(14, y - 2, 196, y - 2); // horizontal line
-
-                  pushLine("Language", languageCode || "Unknown");
-                  pushLine(
-                    "Symptoms",
-                    entities.symptoms?.length ? entities.symptoms.join(", ") : "—"
-                  );
-                  pushLine(
-                    "Medications",
-                    entities.medications?.length ? entities.medications.join(", ") : "—"
-                  );
-                  pushLine(
-                    "Diseases",
-                    entities.diseases?.length ? entities.diseases.join(", ") : "—"
-                  );
-                  pushLine(
-                    "Procedures",
-                    entities.procedures?.length ? entities.procedures.join(", ") : "—"
-                  );
-
-                  const otherString = entities.other?.length
-                    ? entities.other
-                        .map(
-                          (o) =>
-                            `${o.word} (${o.type}${
-                              o.confidence !== undefined
-                                ? `, ${Math.round(o.confidence * 100)}%`
-                                : ""
-                            })`
-                        )
-                        .join(", ")
-                    : "—";
-                  pushLine("Other Entities", otherString);
-
-                  y += 5;
-                  doc.line(14, y - 2, 196, y - 2); // horizontal line
-
-                  if (soapNotes) {
-                    pushBlock("SOAP Subjective", soapNotes.subjective || "—");
-                    pushBlock("SOAP Objective", soapNotes.objective || "—");
-                    pushBlock("SOAP Assessment", soapNotes.assessment || "—");
-                    pushBlock("SOAP Plan", soapNotes.plan || "—");
-                  }
-
-                  y += 5;
-                  doc.line(14, y - 2, 196, y - 2); // horizontal line
-
-                  pushBlock("Full Transcription", text || "—");
-
-                  doc.save("prescription-summary.pdf");
-                } catch (err) {
-                  console.error("Failed to generate PDF", err);
-                  setError("Failed to generate PDF.");
-                }
-              }}
-              className="ml-2"
-              size="lg"
-            >
-              Download Prescription (PDF)
-            </Button>
-          </div>
         </>
       )}
 
-      {/* 7. REMOVED: Old monolithic card and transcription card are gone from here */}
+      {/* AI Suggestions card: render whenever differentials exist (moved out so it shows even if entities is null) */}
+      {differentials && (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>AI Suggestions</CardTitle>
+            <CardDescription>Based on your generated SOAP notes</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {differentials.primary_suspected_diagnosis ? (
+              <div>
+                <h4 className="text-sm font-medium">Primary suspected diagnosis</h4>
+                <p className="text-sm text-muted-foreground">
+                  {differentials.primary_suspected_diagnosis}
+                </p>
+              </div>
+            ) : null}
+
+            {Array.isArray(differentials.differential_diagnoses) &&
+            differentials.differential_diagnoses.length > 0 ? (
+              <div>
+                <h4 className="text-sm font-medium">Differential diagnoses</h4>
+                <div className="mt-2 space-y-3">
+                  {differentials.differential_diagnoses.map((d, idx) => (
+                    <div key={idx} className="rounded-md border p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{d.diagnosis || "—"}</span>
+                        {d.likelihood && (
+                          <span className="text-xs text-muted-foreground">{d.likelihood}</span>
+                        )}
+                      </div>
+                      {d.reasoning && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Reasoning: {d.reasoning}
+                        </p>
+                      )}
+                      {d.supporting_evidence && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Evidence: {d.supporting_evidence}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {Array.isArray(differentials.additional_tests) &&
+            differentials.additional_tests.length > 0 ? (
+              <div>
+                <h4 className="text-sm font-medium">Recommended tests</h4>
+                <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
+                  {differentials.additional_tests.map((t, idx) => (
+                    <li key={idx}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {Array.isArray(differentials.red_flags) && differentials.red_flags.length > 0 ? (
+              <div>
+                <h4 className="text-sm font-medium text-red-600">Red flags</h4>
+                <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
+                  {differentials.red_flags.map((r, idx) => (
+                    <li key={idx}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Download button (uses both soapNotes and differentials if present) */}
+      <div className="flex justify-end mt-6">
+        <Button
+          onClick={downloadPrescriptionPDF}
+          className="ml-2"
+          size="lg"
+        >
+          Download Prescription (PDF)
+        </Button>
+      </div>
     </div>
   );
 }
