@@ -45,14 +45,14 @@ export default function FeaturesSection() {
           <div className="border-border/50 relative rounded-3xl border p-3 lg:col-span-3">
             <div className="bg-linear-to-b aspect-76/59 relative rounded-2xl from-zinc-300 to-transparent p-px dark:from-zinc-700">
               <Image
-                src="/medical-dashboard-dark.png"
-                className="hidden rounded-[15px] dark:block"
+                src="/yo.png"
+                className="hidden h-full rounded-[15px] dark:block"
                 alt="AI prescription dashboard dark"
                 width={1207}
                 height={929}
               />
               <Image
-                src="/feature.png"
+                src="/yo.png"
                 className="rounded-[15px] shadow dark:hidden"
                 alt="AI prescription dashboard light"
                 width={1207}
