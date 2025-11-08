@@ -28,12 +28,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 // 2. ADDED: Tab component imports
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MedicalEntities, OtherEntity } from "@/lib/types";
 const CHUNKS_LENGTH = 10000;
 import { socket } from "@/lib/socket";
@@ -247,7 +242,11 @@ export function RecordPage() {
 
         <Sheet open={imageOpen} onOpenChange={setImageOpen}>
           <SheetTrigger asChild>
-            <Button size="lg" variant="secondary" className="w-full h-16 text-lg relative">
+            <Button
+              size="lg"
+              variant="secondary"
+              className="w-full h-16 text-lg relative"
+            >
               <ImageIcon className="mr-2 h-5 w-5" />
               Upload Image (optional)
               {imageFile && (
@@ -272,6 +271,8 @@ export function RecordPage() {
                 accept="image/*"
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
+                  console.log(file);
+
                   setImageFile(file);
                   if (file) {
                     setImageOpen(false); // Auto-close on selection
@@ -315,11 +316,18 @@ export function RecordPage() {
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Record Audio</CardTitle>
-          <CardDescription>Record a new conversation directly from your microphone.</CardDescription>
+          <CardDescription>
+            Record a new conversation directly from your microphone.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {!recording ? (
-            <Button onClick={startRecording} size="lg" className="w-full h-16 text-lg text-white" variant={"default"}>
+            <Button
+              onClick={startRecording}
+              size="lg"
+              className="w-full h-16 text-lg text-white"
+              variant={"default"}
+            >
               <Mic className="mr-2 h-5 w-5" />
               Start Recording
             </Button>
@@ -348,11 +356,17 @@ export function RecordPage() {
         <CardHeader>
           <CardTitle>Transcription</CardTitle>
           <CardDescription>
-            The transcribed text will appear below. You can also edit it manually before generating notes.
+            The transcribed text will appear below. You can also edit it manually before
+            generating notes.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Textarea value={text} onChange={(e) => setText(e.target.value)} className="h-60" placeholder="Your transcribed text will appear here..." />
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="h-60"
+            placeholder="Your transcribed text will appear here..."
+          />
         </CardContent>
       </Card>
 
@@ -373,7 +387,9 @@ export function RecordPage() {
                   <CardDescription>
                     Entities extracted from the transcription.
                     {languageCode && (
-                      <span className="block text-xs text-muted-foreground mt-1">Language: {languageCode}</span>
+                      <span className="block text-xs text-muted-foreground mt-1">
+                        Language: {languageCode}
+                      </span>
                     )}
                   </CardDescription>
                 </CardHeader>
@@ -386,29 +402,43 @@ export function RecordPage() {
                   </div>
                   <div>
                     <p className="font-medium text-muted-foreground mb-2">Symptoms</p>
-                    <p>{entities.symptoms?.length ? entities.symptoms.join(", ") : "—"}</p>
+                    <p>
+                      {entities.symptoms?.length ? entities.symptoms.join(", ") : "—"}
+                    </p>
                   </div>
                   <div>
                     <p className="font-medium text-muted-foreground mb-2">Medications</p>
-                    <p>{entities.medications?.length ? entities.medications.join(", ") : "—"}</p>
+                    <p>
+                      {entities.medications?.length
+                        ? entities.medications.join(", ")
+                        : "—"}
+                    </p>
                   </div>
                   <div>
                     <p className="font-medium text-muted-foreground mb-2">Diseases</p>
-                    <p>{entities.diseases?.length ? entities.diseases.join(", ") : "—"}</p>
+                    <p>
+                      {entities.diseases?.length ? entities.diseases.join(", ") : "—"}
+                    </p>
                   </div>
                   <div>
                     <p className="font-medium text-muted-foreground mb-2">Procedures</p>
-                    <p>{entities.procedures?.length ? entities.procedures.join(", ") : "—"}</p>
+                    <p>
+                      {entities.procedures?.length ? entities.procedures.join(", ") : "—"}
+                    </p>
                   </div>
                   <div className="md:col-span-2">
-                    <p className="font-medium text-muted-foreground mb-2">Other Entities</p>
+                    <p className="font-medium text-muted-foreground mb-2">
+                      Other Entities
+                    </p>
                     <p>
                       {entities.other?.length
                         ? entities.other
                             .map(
                               (o) =>
                                 `${o.word} (${o.type}${
-                                  o.confidence !== undefined ? `, ${Math.round(o.confidence * 100)}%` : ""
+                                  o.confidence !== undefined
+                                    ? `, ${Math.round(o.confidence * 100)}%`
+                                    : ""
                                 })`
                             )
                             .join(", ")
@@ -440,8 +470,12 @@ export function RecordPage() {
                     <div className="space-y-4 text-sm">
                       {soapNotes.image_descriptions && (
                         <div>
-                          <p className="font-medium text-muted-foreground">Image Description</p>
-                          <p className="whitespace-pre-wrap">{soapNotes.image_descriptions}</p>
+                          <p className="font-medium text-muted-foreground">
+                            Image Description
+                          </p>
+                          <p className="whitespace-pre-wrap">
+                            {soapNotes.image_descriptions}
+                          </p>
                         </div>
                       )}
                       {soapNotes.subjective && (
@@ -468,13 +502,15 @@ export function RecordPage() {
                           <p className="whitespace-pre-wrap">{soapNotes.plan}</p>
                         </div>
                       )}
-                      {!soapNotes.subjective && !soapNotes.objective && !soapNotes.assessment && !soapNotes.plan && (
-                        <p>—</p>
-                      )}
+                      {!soapNotes.subjective &&
+                        !soapNotes.objective &&
+                        !soapNotes.assessment &&
+                        !soapNotes.plan && <p>—</p>}
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      Click &ldquo;Generate SOAP Notes&quot; to create a note from the transcription.
+                      Click &ldquo;Generate SOAP Notes&quot; to create a note from the
+                      transcription.
                     </p>
                   )}
                 </CardContent>
@@ -492,9 +528,8 @@ export function RecordPage() {
                         const fd = new FormData();
                         fd.append("conversation_text", text);
                         if (imageFile) {
-                          fd.append("image", imageFile);
+                          fd.append("images", imageFile);
                         }
-
                         const llmUrl = process.env.NEXT_PUBLIC_LLM_URL;
                         if (!llmUrl) {
                           throw new Error("NEXT_PUBLIC_LLM_URL is not configured");
@@ -505,7 +540,10 @@ export function RecordPage() {
                         });
                         const data = await res.json();
                         if (!res.ok) {
-                          throw new Error((data && (data as { message?: string }).message) || `Request failed: ${res.status}`);
+                          throw new Error(
+                            (data && (data as { message?: string }).message) ||
+                              `Request failed: ${res.status}`
+                          );
                         }
                         const out = data as {
                           image_descriptions?: string;
@@ -526,7 +564,10 @@ export function RecordPage() {
                         });
                       } catch (e: unknown) {
                         console.error(e);
-                        const msg = e instanceof Error ? e.message : "Failed to generate SOAP notes.";
+                        const msg =
+                          e instanceof Error
+                            ? e.message
+                            : "Failed to generate SOAP notes.";
                         setSoapError(msg);
                       } finally {
                         setSoapGenerating(false);
@@ -568,10 +609,10 @@ export function RecordPage() {
                       y = 20;
                     }
                   };
-                  
+
                   // Simplified pushLine for long text
                   const pushBlock = (label: string, value: string) => {
-                     doc.setFont("helvetica", "bold");
+                    doc.setFont("helvetica", "bold");
                     doc.text(label, 14, y);
                     y += 7;
                     doc.setFont("helvetica", "normal");
@@ -582,45 +623,58 @@ export function RecordPage() {
                       doc.addPage();
                       y = 20;
                     }
-                  }
+                  };
 
                   pushLine("Doctor Name", String(doctorName));
                   pushLine("Doctor Email", String(doctorEmail));
                   y += 5; // Section break
-                  
-                  doc.line(14, y - 2, 196, y-2); // horizontal line
+
+                  doc.line(14, y - 2, 196, y - 2); // horizontal line
 
                   pushLine("Language", languageCode || "Unknown");
-                  pushLine("Symptoms", entities.symptoms?.length ? entities.symptoms.join(", ") : "—");
-                  pushLine("Medications", entities.medications?.length ? entities.medications.join(", ") : "—");
-                  pushLine("Diseases", entities.diseases?.length ? entities.diseases.join(", ") : "—");
-                  pushLine("Procedures", entities.procedures?.length ? entities.procedures.join(", ") : "—");
-                  
-                  const otherString =
-                    entities.other?.length
-                      ? entities.other
-                          .map(
-                            (o) =>
-                              `${o.word} (${o.type}${
-                                o.confidence !== undefined ? `, ${Math.round(o.confidence * 100)}%` : ""
-                              })`
-                          )
-                          .join(", ")
-                      : "—";
+                  pushLine(
+                    "Symptoms",
+                    entities.symptoms?.length ? entities.symptoms.join(", ") : "—"
+                  );
+                  pushLine(
+                    "Medications",
+                    entities.medications?.length ? entities.medications.join(", ") : "—"
+                  );
+                  pushLine(
+                    "Diseases",
+                    entities.diseases?.length ? entities.diseases.join(", ") : "—"
+                  );
+                  pushLine(
+                    "Procedures",
+                    entities.procedures?.length ? entities.procedures.join(", ") : "—"
+                  );
+
+                  const otherString = entities.other?.length
+                    ? entities.other
+                        .map(
+                          (o) =>
+                            `${o.word} (${o.type}${
+                              o.confidence !== undefined
+                                ? `, ${Math.round(o.confidence * 100)}%`
+                                : ""
+                            })`
+                        )
+                        .join(", ")
+                    : "—";
                   pushLine("Other Entities", otherString);
-                  
+
                   y += 5;
-                  doc.line(14, y - 2, 196, y-2); // horizontal line
-                  
+                  doc.line(14, y - 2, 196, y - 2); // horizontal line
+
                   if (soapNotes) {
                     pushBlock("SOAP Subjective", soapNotes.subjective || "—");
                     pushBlock("SOAP Objective", soapNotes.objective || "—");
                     pushBlock("SOAP Assessment", soapNotes.assessment || "—");
                     pushBlock("SOAP Plan", soapNotes.plan || "—");
                   }
-                  
+
                   y += 5;
-                  doc.line(14, y - 2, 196, y-2); // horizontal line
+                  doc.line(14, y - 2, 196, y - 2); // horizontal line
 
                   pushBlock("Full Transcription", text || "—");
 
