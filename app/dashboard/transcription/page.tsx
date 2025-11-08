@@ -20,14 +20,59 @@ import {
   SheetDescription,
   SheetTrigger,
 } from "@/components/ui/sheet";
-
-import { processAudioFile } from "@/lib/api";
-import { MedicalEntities } from "@/lib/types";
-// jsPDF will be dynamically imported when needed to avoid SSR issues
-
-type MRWithMime = MediaRecorder & { mimeType?: string };
+import { MedicalEntities, OtherEntity } from "@/lib/types";
 const CHUNKS_LENGTH = 10000;
 import { socket } from "@/lib/socket";
+import { useUser } from "@clerk/nextjs";
+
+
+function norm(s: string): string {
+  return s.trim().toLowerCase();
+}
+function mergeStringLists(prev?: string[], incoming?: string[]) {
+  const result = [...(prev ?? [])];
+  const set = new Set(result.map(norm));
+  for (const x of incoming ?? []) {
+    const nx = norm(x);
+    if (!set.has(nx)) {
+      result.push(x);
+      set.add(nx);
+    }
+  }
+  return result;
+}
+function mergeOtherEntities(prev?: OtherEntity[], incoming?: OtherEntity[]) {
+  const map = new Map<string, OtherEntity>();
+  for (const o of prev ?? []) {
+    const key = `${norm(o.word)}|${norm(o.type)}`;
+    map.set(key, o);
+  }
+  for (const o of incoming ?? []) {
+    const key = `${norm(o.word)}|${norm(o.type)}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, o);
+    } else {
+      const confidence = Math.max(existing.confidence ?? 0, o.confidence ?? 0);
+      map.set(key, { ...existing, confidence });
+    }
+  }
+  return Array.from(map.values());
+}
+function mergeEntities(
+  prev: MedicalEntities | null,
+  incoming: MedicalEntities | null
+): MedicalEntities | null {
+  if (!incoming) return prev ?? null;
+  if (!prev) return incoming;
+  return {
+    diseases: mergeStringLists(prev.diseases, incoming.diseases),
+    medications: mergeStringLists(prev.medications, incoming.medications),
+    symptoms: mergeStringLists(prev.symptoms, incoming.symptoms),
+    procedures: mergeStringLists(prev.procedures, incoming.procedures),
+    other: mergeOtherEntities(prev.other, incoming.other),
+  };
+}
 
 export default function RecordPage() {
   const [recording, setRecording] = useState(false);
@@ -40,65 +85,47 @@ export default function RecordPage() {
   const [soapOpen, setSoapOpen] = useState(false);
   const [soapNote, setSoapNote] = useState("");
 
-  // const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  // const audioChunksRef = useRef<Blob[]>([]);
-  // const streamRef = useRef<MediaStream | null>(null);
-
   const micRef = useRef<MediaRecorder>(null);
+  const { user } = useUser();
+  const doctorName = user?.fullName || user?.firstName || user?.username || "Unknown";
+  const doctorEmail = user?.primaryEmailAddress?.emailAddress || "Unknown";
 
   useEffect(() => {
     socket.on("connect", () => {
       console.log("connected");
-      // toast("connected");
+    });
+    socket.on("transcripted-data", (data) => {
+      console.log("transcripted-data", data);
+      try {
+        const t = data?.transcription?.text as string | undefined;
+        const lc = (data?.transcription?.language_code as string | null) ?? null;
+        const me = (data?.medical_entities as MedicalEntities | null) ?? null;
+
+        if (typeof t === "string" && t.length) {
+          setText((prev) => {
+            if (!prev) return t;
+            const nl = prev.endsWith("\n") ? "" : "\n";
+            return prev + nl + t;
+          });
+        }
+
+        setLanguageCode(lc);
+        setEntities((prev) => mergeEntities(prev, me));
+        setProcessing(false);
+        setError(null);
+      } catch (e) {
+        console.error(e);
+      }
     });
     return () => {
       socket.off("connect");
+      socket.off("transcripted-data");
       if (micRef.current) {
         micRef.current.removeEventListener("dataavailable", micDataListner);
         micRef.current.removeEventListener("stop", micStopListner);
       }
     };
   }, []);
-
-  // const startRecording = async () => {
-  //   if (recording || processing) return;
-  //   setError(null);
-  //   setText("");
-  //   setEntities(null);
-  //   setLanguageCode(null);
-  //   try {
-  //     streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-  //   } catch (err) {
-  //     console.error(err);
-  //     setError("Failed to access microphone. Please check browser permissions.");
-  //     return;
-  //   }
-
-  //   audioChunksRef.current = [];
-  //   const mimeType = "audio/webm";
-
-  //   const recorder = new MediaRecorder(streamRef.current!, { mimeType });
-
-  //   recorder.ondataavailable = (e: BlobEvent) => {
-  //     if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
-  //   };
-
-  //   recorder.onerror = () => {
-  //     setError("Recording error occurred.");
-  //     setRecording(false);
-  //   };
-
-  //   try {
-  //     recorder.start();
-  //   } catch (err) {
-  //     console.error(err);
-  //     setError("Failed to start recording.");
-  //     return;
-  //   }
-
-  //   mediaRecorderRef.current = recorder;
-  //   setRecording(true);
-  // };
 
   const micDataListner = async (e: BlobEvent) => {
     console.log("streaming audio to backend..");
@@ -113,6 +140,12 @@ export default function RecordPage() {
   };
 
   const startRecording = async () => {
+    setError(null);
+    setText("");
+    setEntities(null);
+    setLanguageCode(null);
+    setProcessing(true);
+
     socket.emit("audio-channel-commands", "start");
     console.log("rec starting...");
 
@@ -124,68 +157,16 @@ export default function RecordPage() {
       });
       const mic = new MediaRecorder(userMedia);
       micRef.current = mic;
-      // should have added timeslice here. Without timeslice, the audio will be captured in a single chunks
-      // for now 10s chunks are sent to backend
       mic.start(CHUNKS_LENGTH);
       mic.addEventListener("dataavailable", micDataListner);
       mic.addEventListener("stop", micStopListner);
     } catch (error) {
       setRecording(false);
+      setProcessing(false);
       console.log(error);
+      setError("Failed to access microphone. Please check browser permissions.");
     }
   };
-
-  // const stopRecording = async () => {
-  //   const mr = mediaRecorderRef.current;
-  //   if (!mr || mr.state !== "recording") return;
-
-  //   mr.onstop = async () => {
-  //     const chunks = audioChunksRef.current.slice();
-  //     audioChunksRef.current = [];
-
-  //     if (streamRef.current) {
-  //       streamRef.current.getTracks().forEach((t) => t.stop());
-  //       streamRef.current = null;
-  //     }
-  //     mediaRecorderRef.current = null;
-
-  //     if (!chunks.length) {
-  //       setError("No audio captured.");
-  //       setRecording(false);
-  //       return;
-  //     }
-
-  //     const blobType = (mr as MRWithMime).mimeType || "audio/webm";
-  //     const blob = new Blob(chunks, { type: blobType });
-  //     const file = new File([blob], `recording.webm`, { type: blob.type });
-
-  //     setProcessing(true);
-  //     setError(null);
-
-  //     try {
-  //       const data = await processAudioFile(file);
-
-  //       setText(data?.transcription?.text || "");
-  //       setLanguageCode(data?.transcription?.language_code || null);
-  //       setEntities(data?.medical_entities || null);
-  //     } catch (err) {
-  //       console.error(err);
-  //       setError(err instanceof Error ? err.message : String(err));
-  //       setText("");
-  //       setEntities(null);
-  //     } finally {
-  //       setProcessing(false);
-  //     }
-  //   };
-
-  //   try {
-  //     mr.stop();
-  //   } catch (err) {
-  //     console.error("Error stopping recorder:", err);
-  //   }
-
-  //   setRecording(false);
-  // };
 
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-8">
@@ -251,25 +232,16 @@ export default function RecordPage() {
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Record Audio</CardTitle>
-          <CardDescription>
-            Record a new conversation directly from your microphone.
-          </CardDescription>
+          <CardDescription>Record a new conversation directly from your microphone.</CardDescription>
         </CardHeader>
         <CardContent>
           {!recording ? (
-            <Button
-              onClick={startRecording}
-              // disabled={processing}
-              size="lg"
-              className="w-full h-16 text-lg text-white"
-              variant={"default"}
-            >
+            <Button onClick={startRecording} size="lg" className="w-full h-16 text-lg text-white" variant={"default"}>
               <Mic className="mr-2 h-5 w-5" />
               Start Recording
             </Button>
           ) : (
             <Button
-              // onClick={stopRecording}
               onClick={() => {
                 console.log("stopped");
                 setRecording(false);
@@ -277,7 +249,6 @@ export default function RecordPage() {
                   micRef.current.stop();
                 }
               }}
-              // disabled={processing}
               size="lg"
               variant="destructive"
               className="w-full h-16 text-lg"
@@ -292,26 +263,28 @@ export default function RecordPage() {
       {entities && !processing && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Prescription Summary</CardTitle>
+            <CardTitle>Conversation Summary</CardTitle>
             <CardDescription>
               Entities extracted from the transcription.
               {languageCode && (
-                <span className="block text-xs text-muted-foreground mt-1">
-                  Language: {languageCode}
-                </span>
+                <span className="block text-xs text-muted-foreground mt-1">Language: {languageCode}</span>
               )}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+            <div className="md:col-span-2">
+              <p className="font-medium text-muted-foreground mb-2">Doctor</p>
+              <p>
+                {String(doctorName)} ({String(doctorEmail)})
+              </p>
+            </div>
             <div>
               <p className="font-medium text-muted-foreground mb-2">Symptoms</p>
               <p>{entities.symptoms?.length ? entities.symptoms.join(", ") : "—"}</p>
             </div>
             <div>
               <p className="font-medium text-muted-foreground mb-2">Medications</p>
-              <p>
-                {entities.medications?.length ? entities.medications.join(", ") : "—"}
-              </p>
+              <p>{entities.medications?.length ? entities.medications.join(", ") : "—"}</p>
             </div>
             <div>
               <p className="font-medium text-muted-foreground mb-2">Diseases</p>
@@ -321,11 +294,25 @@ export default function RecordPage() {
               <p className="font-medium text-muted-foreground mb-2">Procedures</p>
               <p>{entities.procedures?.length ? entities.procedures.join(", ") : "—"}</p>
             </div>
+            <div className="md:col-span-2">
+              <p className="font-medium text-muted-foreground mb-2">Other Entities</p>
+              <p>
+                {entities.other?.length
+                  ? entities.other
+                      .map(
+                        (o) =>
+                          `${o.word} (${o.type}${
+                            o.confidence !== undefined ? `, ${Math.round(o.confidence * 100)}%` : ""
+                          })`
+                      )
+                      .join(", ")
+                  : "—"}
+              </p>
+            </div>
           </CardContent>
           <div className="p-4 border-t flex justify-end">
             <Button
               onClick={async () => {
-                // build a simple PDF with the prescription summary
                 try {
                   const { jsPDF } = await import("jspdf");
                   const doc = new jsPDF();
@@ -346,23 +333,29 @@ export default function RecordPage() {
                     }
                   };
 
+                  pushLine("Doctor Name", String(doctorName));
+                  pushLine("Doctor Email", String(doctorEmail));
+
                   pushLine("Language", languageCode || "Unknown");
-                  pushLine(
-                    "Symptoms",
-                    entities.symptoms?.length ? entities.symptoms.join(", ") : "—"
-                  );
-                  pushLine(
-                    "Medications",
-                    entities.medications?.length ? entities.medications.join(", ") : "—"
-                  );
-                  pushLine(
-                    "Diseases",
-                    entities.diseases?.length ? entities.diseases.join(", ") : "—"
-                  );
-                  pushLine(
-                    "Procedures",
-                    entities.procedures?.length ? entities.procedures.join(", ") : "—"
-                  );
+                  pushLine("Symptoms", entities.symptoms?.length ? entities.symptoms.join(", ") : "—");
+                  pushLine("Medications", entities.medications?.length ? entities.medications.join(", ") : "—");
+                  pushLine("Diseases", entities.diseases?.length ? entities.diseases.join(", ") : "—");
+                  pushLine("Procedures", entities.procedures?.length ? entities.procedures.join(", ") : "—");
+
+                  const otherString =
+                    entities.other?.length
+                      ? entities.other
+                          .map(
+                            (o) =>
+                              `${o.word} (${o.type}${
+                                o.confidence !== undefined ? `, ${Math.round(o.confidence * 100)}%` : ""
+                              })`
+                          )
+                          .join(", ")
+                      : "—";
+                  pushLine("Other Entities", otherString);
+
+                  pushLine("Transcription", text || "—");
 
                   doc.save("prescription-summary.pdf");
                 } catch (err) {
@@ -384,12 +377,7 @@ export default function RecordPage() {
           <CardDescription>The transcribed text will appear below.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="h-80"
-            placeholder="Your transcribed text will appear here..."
-          />
+          <Textarea value={text} onChange={(e) => setText(e.target.value)} className="h-80" placeholder="Your transcribed text will appear here..." />
         </CardContent>
       </Card>
     </div>
