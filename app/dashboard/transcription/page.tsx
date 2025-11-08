@@ -1,7 +1,6 @@
-
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import Header from '@/components/Header';
+import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,14 +11,23 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Mic, StopCircle, AlertTriangle, Loader2 } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
+import { Mic, StopCircle, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
-import { processAudioFile } from '@/lib/api';
-import { MedicalEntities } from '@/lib/types';
+import { processAudioFile } from "@/lib/api";
+import { MedicalEntities } from "@/lib/types";
 // jsPDF will be dynamically imported when needed to avoid SSR issues
 
 type MRWithMime = MediaRecorder & { mimeType?: string };
+const CHUNKS_LENGTH = 10000;
+import { socket } from "@/lib/socket";
 
 export default function RecordPage() {
   const [recording, setRecording] = useState(false);
@@ -32,116 +40,152 @@ export default function RecordPage() {
   const [soapOpen, setSoapOpen] = useState(false);
   const [soapNote, setSoapNote] = useState("");
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
+  // const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  // const audioChunksRef = useRef<Blob[]>([]);
+  // const streamRef = useRef<MediaStream | null>(null);
+
+  const micRef = useRef<MediaRecorder>(null);
 
   useEffect(() => {
+    socket.on("connect", () => {
+      console.log("connected");
+      // toast("connected");
+    });
     return () => {
-      try {
-        const mr = mediaRecorderRef.current;
-        if (mr && mr.state === "recording") {
-          mr.stop();
-        }
-      } catch {}
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
+      socket.off("connect");
+      if (micRef.current) {
+        micRef.current.removeEventListener("dataavailable", micDataListner);
+        micRef.current.removeEventListener("stop", micStopListner);
       }
     };
   }, []);
 
+  // const startRecording = async () => {
+  //   if (recording || processing) return;
+  //   setError(null);
+  //   setText("");
+  //   setEntities(null);
+  //   setLanguageCode(null);
+  //   try {
+  //     streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+  //   } catch (err) {
+  //     console.error(err);
+  //     setError("Failed to access microphone. Please check browser permissions.");
+  //     return;
+  //   }
+
+  //   audioChunksRef.current = [];
+  //   const mimeType = "audio/webm";
+
+  //   const recorder = new MediaRecorder(streamRef.current!, { mimeType });
+
+  //   recorder.ondataavailable = (e: BlobEvent) => {
+  //     if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+  //   };
+
+  //   recorder.onerror = () => {
+  //     setError("Recording error occurred.");
+  //     setRecording(false);
+  //   };
+
+  //   try {
+  //     recorder.start();
+  //   } catch (err) {
+  //     console.error(err);
+  //     setError("Failed to start recording.");
+  //     return;
+  //   }
+
+  //   mediaRecorderRef.current = recorder;
+  //   setRecording(true);
+  // };
+
+  const micDataListner = async (e: BlobEvent) => {
+    console.log("streaming audio to backend..");
+    socket.emit("audio-channel", await e.data.arrayBuffer());
+  };
+  const micStopListner = (e: Event) => {
+    console.log("recording stopped");
+    if (micRef.current) {
+      micRef.current.stop();
+    }
+    socket.emit("audio-channel-commands", "stop");
+  };
+
   const startRecording = async () => {
-    if (recording || processing) return;
-    setError(null);
-    setText("");
-    setEntities(null);
-    setLanguageCode(null);
-    try {
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (err) {
-      console.error(err);
-      setError("Failed to access microphone. Please check browser permissions.");
-      return;
-    }
+    socket.emit("audio-channel-commands", "start");
+    console.log("rec starting...");
 
-    audioChunksRef.current = [];
-    const mimeType = "audio/webm";
-
-    const recorder = new MediaRecorder(streamRef.current!, { mimeType });
-
-    recorder.ondataavailable = (e: BlobEvent) => {
-      if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
-    };
-
-    recorder.onerror = () => {
-      setError("Recording error occurred.");
-      setRecording(false);
-    };
-
-    try {
-      recorder.start();
-    } catch (err) {
-      console.error(err);
-      setError("Failed to start recording.");
-      return;
-    }
-
-    mediaRecorderRef.current = recorder;
     setRecording(true);
-  };
-
-  const stopRecording = async () => {
-    const mr = mediaRecorderRef.current;
-    if (!mr || mr.state !== "recording") return;
-
-  mr.onstop = async () => {
-      const chunks = audioChunksRef.current.slice();
-      audioChunksRef.current = [];
-
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-      mediaRecorderRef.current = null;
-
-      if (!chunks.length) {
-        setError("No audio captured.");
-        setRecording(false);
-        return;
-      }
-
-  const blobType = (mr as MRWithMime).mimeType || "audio/webm";
-      const blob = new Blob(chunks, { type: blobType });
-      const file = new File([blob], `recording.webm`, { type: blob.type });
-
-      setProcessing(true);
-      setError(null);
-
-      try {
-        const data = await processAudioFile(file);
-
-        setText(data?.transcription?.text || "");
-        setLanguageCode(data?.transcription?.language_code || null);
-        setEntities(data?.medical_entities || null);
-      } catch (err) {
-        console.error(err);
-        setError(err instanceof Error ? err.message : String(err));
-        setText("");
-        setEntities(null);
-      } finally {
-        setProcessing(false);
-      }
-    };
-
     try {
-      mr.stop();
-    } catch (err) {
-      console.error("Error stopping recorder:", err);
+      const userMedia = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+      const mic = new MediaRecorder(userMedia);
+      micRef.current = mic;
+      // should have added timeslice here. Without timeslice, the audio will be captured in a single chunks
+      // for now 10s chunks are sent to backend
+      mic.start(CHUNKS_LENGTH);
+      mic.addEventListener("dataavailable", micDataListner);
+      mic.addEventListener("stop", micStopListner);
+    } catch (error) {
+      setRecording(false);
+      console.log(error);
     }
-
-    setRecording(false);
   };
+
+  // const stopRecording = async () => {
+  //   const mr = mediaRecorderRef.current;
+  //   if (!mr || mr.state !== "recording") return;
+
+  //   mr.onstop = async () => {
+  //     const chunks = audioChunksRef.current.slice();
+  //     audioChunksRef.current = [];
+
+  //     if (streamRef.current) {
+  //       streamRef.current.getTracks().forEach((t) => t.stop());
+  //       streamRef.current = null;
+  //     }
+  //     mediaRecorderRef.current = null;
+
+  //     if (!chunks.length) {
+  //       setError("No audio captured.");
+  //       setRecording(false);
+  //       return;
+  //     }
+
+  //     const blobType = (mr as MRWithMime).mimeType || "audio/webm";
+  //     const blob = new Blob(chunks, { type: blobType });
+  //     const file = new File([blob], `recording.webm`, { type: blob.type });
+
+  //     setProcessing(true);
+  //     setError(null);
+
+  //     try {
+  //       const data = await processAudioFile(file);
+
+  //       setText(data?.transcription?.text || "");
+  //       setLanguageCode(data?.transcription?.language_code || null);
+  //       setEntities(data?.medical_entities || null);
+  //     } catch (err) {
+  //       console.error(err);
+  //       setError(err instanceof Error ? err.message : String(err));
+  //       setText("");
+  //       setEntities(null);
+  //     } finally {
+  //       setProcessing(false);
+  //     }
+  //   };
+
+  //   try {
+  //     mr.stop();
+  //   } catch (err) {
+  //     console.error("Error stopping recorder:", err);
+  //   }
+
+  //   setRecording(false);
+  // };
 
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-8">
@@ -150,7 +194,7 @@ export default function RecordPage() {
       <div className="mb-6">
         <Sheet open={soapOpen} onOpenChange={setSoapOpen}>
           <SheetTrigger asChild>
-            <Button size="lg" variant="outline" className="w-full h-16 text-lg">
+            <Button size="lg" variant="secondary" className="w-full h-16 text-lg">
               RunAnywhere SDK (SOAP Note)
             </Button>
           </SheetTrigger>
@@ -178,7 +222,9 @@ export default function RecordPage() {
                 className="h-48"
               />
               <div className="flex justify-end gap-2">
-                <Button variant="secondary" onClick={() => setSoapOpen(false)}>Close</Button>
+                <Button variant="secondary" onClick={() => setSoapOpen(false)}>
+                  Close
+                </Button>
                 <Button onClick={() => setSoapOpen(false)}>Save</Button>
               </div>
             </div>
@@ -198,9 +244,7 @@ export default function RecordPage() {
         <Alert className="mb-6">
           <Loader2 className="h-4 w-4 animate-spin" />
           <AlertTitle>Processing Audio</AlertTitle>
-          <AlertDescription>
-            Connecting to Server, please wait...
-          </AlertDescription>
+          <AlertDescription>Connecting to Server, please wait...</AlertDescription>
         </Alert>
       )}
 
@@ -215,17 +259,25 @@ export default function RecordPage() {
           {!recording ? (
             <Button
               onClick={startRecording}
-              disabled={processing}
+              // disabled={processing}
               size="lg"
-              className="w-full h-16 text-lg bg-green-600 hover:bg-green-700 text-white"
+              className="w-full h-16 text-lg text-white"
+              variant={"default"}
             >
               <Mic className="mr-2 h-5 w-5" />
               Start Recording
             </Button>
           ) : (
             <Button
-              onClick={stopRecording}
-              disabled={processing}
+              // onClick={stopRecording}
+              onClick={() => {
+                console.log("stopped");
+                setRecording(false);
+                if (micRef.current) {
+                  micRef.current.stop();
+                }
+              }}
+              // disabled={processing}
               size="lg"
               variant="destructive"
               className="w-full h-16 text-lg"
@@ -257,7 +309,9 @@ export default function RecordPage() {
             </div>
             <div>
               <p className="font-medium text-muted-foreground mb-2">Medications</p>
-              <p>{entities.medications?.length ? entities.medications.join(", ") : "—"}</p>
+              <p>
+                {entities.medications?.length ? entities.medications.join(", ") : "—"}
+              </p>
             </div>
             <div>
               <p className="font-medium text-muted-foreground mb-2">Diseases</p>
@@ -273,9 +327,9 @@ export default function RecordPage() {
               onClick={async () => {
                 // build a simple PDF with the prescription summary
                 try {
-                  const { jsPDF } = await import('jspdf');
+                  const { jsPDF } = await import("jspdf");
                   const doc = new jsPDF();
-                  const title = 'Prescription Summary';
+                  const title = "Prescription Summary";
                   doc.setFontSize(18);
                   doc.text(title, 14, 20);
 
@@ -292,16 +346,28 @@ export default function RecordPage() {
                     }
                   };
 
-                  pushLine('Language', languageCode || 'Unknown');
-                  pushLine('Symptoms', entities.symptoms?.length ? entities.symptoms.join(', ') : '—');
-                  pushLine('Medications', entities.medications?.length ? entities.medications.join(', ') : '—');
-                  pushLine('Diseases', entities.diseases?.length ? entities.diseases.join(', ') : '—');
-                  pushLine('Procedures', entities.procedures?.length ? entities.procedures.join(', ') : '—');
+                  pushLine("Language", languageCode || "Unknown");
+                  pushLine(
+                    "Symptoms",
+                    entities.symptoms?.length ? entities.symptoms.join(", ") : "—"
+                  );
+                  pushLine(
+                    "Medications",
+                    entities.medications?.length ? entities.medications.join(", ") : "—"
+                  );
+                  pushLine(
+                    "Diseases",
+                    entities.diseases?.length ? entities.diseases.join(", ") : "—"
+                  );
+                  pushLine(
+                    "Procedures",
+                    entities.procedures?.length ? entities.procedures.join(", ") : "—"
+                  );
 
-                  doc.save('prescription-summary.pdf');
+                  doc.save("prescription-summary.pdf");
                 } catch (err) {
-                  console.error('Failed to generate PDF', err);
-                  setError('Failed to generate PDF.');
+                  console.error("Failed to generate PDF", err);
+                  setError("Failed to generate PDF.");
                 }
               }}
               className="ml-2"
@@ -315,9 +381,7 @@ export default function RecordPage() {
       <Card>
         <CardHeader>
           <CardTitle>Transcription</CardTitle>
-          <CardDescription>
-            The transcribed text will appear below.
-          </CardDescription>
+          <CardDescription>The transcribed text will appear below.</CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea
@@ -331,4 +395,3 @@ export default function RecordPage() {
     </div>
   );
 }
-                
