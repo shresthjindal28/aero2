@@ -13,6 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Mic, StopCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 
 import { processAudioFile } from '@/lib/api';
 import { MedicalEntities } from '@/lib/types';
@@ -28,6 +29,8 @@ export default function RecordPage() {
 
   const [languageCode, setLanguageCode] = useState<string | null>(null);
   const [entities, setEntities] = useState<MedicalEntities | null>(null);
+  const [soapOpen, setSoapOpen] = useState(false);
+  const [soapNote, setSoapNote] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -143,6 +146,45 @@ export default function RecordPage() {
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-8">
       <Header content={"Record Transcription"} className="text-3xl font-bold mb-8" />
+
+      <div className="mb-6">
+        <Sheet open={soapOpen} onOpenChange={setSoapOpen}>
+          <SheetTrigger asChild>
+            <Button size="lg" variant="outline" className="w-full h-16 text-lg">
+              RunAnywhere SDK (SOAP Note)
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle>RunAnywhere SDK</SheetTitle>
+              <SheetDescription>
+                Enter your SOAP note below. Learn more at{" "}
+                <a
+                  href="https://github.com/RunanywhereAI/runanywhere-sdks"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  GitHub
+                </a>
+                .
+              </SheetDescription>
+            </SheetHeader>
+            <div className="p-4 space-y-4">
+              <Textarea
+                value={soapNote}
+                onChange={(e) => setSoapNote(e.target.value)}
+                placeholder="Enter your SOAP note..."
+                className="h-48"
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setSoapOpen(false)}>Close</Button>
+                <Button onClick={() => setSoapOpen(false)}>Save</Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
 
       {error && (
         <Alert variant="destructive" className="mb-6">
