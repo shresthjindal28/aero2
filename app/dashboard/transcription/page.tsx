@@ -105,7 +105,8 @@ function RecordPage() {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [soapGen, setSoapGen] = useState(false);
-  const [differentials, setdifferentials] = useState<DifferentialResponse | null>(null);
+  const [differentials, setdifferentials] =
+    useState<DifferentialResponse | null>(null);
   const [gettingSugg, setGettingSugg] = useState(false);
 
   const [languageCode, setLanguageCode] = useState<string | null>(null);
@@ -127,7 +128,8 @@ function RecordPage() {
 
   const micRef = useRef<MediaRecorder>(null);
   const { user } = useUser();
-  const doctorName = user?.fullName || user?.firstName || user?.username || "Unknown";
+  const doctorName =
+    user?.fullName || user?.firstName || user?.username || "Unknown";
   const doctorEmail = user?.primaryEmailAddress?.emailAddress || "Unknown";
   // --- End State and Refs ---
 
@@ -140,7 +142,8 @@ function RecordPage() {
       console.log("transcripted-data", data);
       try {
         const t = data?.transcription?.text as string | undefined;
-        const lc = (data?.transcription?.language_code as string | null) ?? null;
+        const lc =
+          (data?.transcription?.language_code as string | null) ?? null;
         const me = (data?.medical_entities as MedicalEntities | null) ?? null;
 
         if (typeof t === "string" && t.length) {
@@ -206,7 +209,9 @@ function RecordPage() {
       setRecording(false);
       setProcessing(false);
       console.log(error);
-      setError("Failed to access microphone. Please check browser permissions.");
+      setError(
+        "Failed to access microphone. Please check browser permissions."
+      );
     }
   };
   // --- End useEffect and Listeners ---
@@ -231,8 +236,16 @@ function RecordPage() {
         doc.setFont("helvetica", "normal");
         const now = new Date();
         doc.text(`Date: ${now.toLocaleString()}`, marginLeft, 48);
-        doc.text(`Doctor: ${String(doctorName)}`, pageWidth - marginRight - 180, 48);
-        doc.text(`Email: ${String(doctorEmail)}`, pageWidth - marginRight - 180, 62);
+        doc.text(
+          `Doctor: ${String(doctorName)}`,
+          pageWidth - marginRight - 180,
+          48
+        );
+        doc.text(
+          `Email: ${String(doctorEmail)}`,
+          pageWidth - marginRight - 180,
+          62
+        );
         y = 80;
         doc.setLineWidth(0.5);
         doc.line(marginLeft, y - 10, pageWidth - marginRight, y - 10);
@@ -323,10 +336,17 @@ function RecordPage() {
         y += 16;
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
-        if (Array.isArray(differentials.differential_diagnoses) && differentials.differential_diagnoses.length > 0) {
+        if (
+          Array.isArray(differentials.differential_diagnoses) &&
+          differentials.differential_diagnoses.length > 0
+        ) {
           differentials.differential_diagnoses.forEach((d, i) => {
             ensureSpace(40);
-            const block = `${i + 1}. ${d.diagnosis} (${d.likelihood || "—"})\nReasoning: ${d.reasoning || "—"}\nEvidence: ${d.supporting_evidence || "—"}`;
+            const block = `${i + 1}. ${d.diagnosis} (${
+              d.likelihood || "—"
+            })\nReasoning: ${d.reasoning || "—"}\nEvidence: ${
+              d.supporting_evidence || "—"
+            }`;
             const lines = doc.splitTextToSize(block, usableWidth);
             doc.text(lines, marginLeft, y);
             y += lines.length * 14 + 8;
@@ -360,13 +380,20 @@ function RecordPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-8">
-      <Header content={"Record Transcription"} className="text-3xl font-bold mb-8" />
+      <Header
+        content={"Record Transcription"}
+        className="text-3xl font-bold mb-8"
+      />
 
       {/* --- Action Buttons (SOAP SDK & Image Upload) - No Change --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <Sheet open={soapOpen} onOpenChange={setSoapOpen}>
           <SheetTrigger asChild>
-            <Button size="lg" variant="secondary" className="w-full h-16 text-lg">
+            <Button
+              size="lg"
+              variant="secondary"
+              className="w-full h-16 text-lg"
+            >
               RunAnywhere SDK (SOAP Note)
             </Button>
           </SheetTrigger>
@@ -469,7 +496,9 @@ function RecordPage() {
         <Alert className="mb-6">
           <Loader2 className="h-4 w-4 animate-spin" />
           <AlertTitle>Processing Audio</AlertTitle>
-          <AlertDescription>Connecting to Server, please wait...</AlertDescription>
+          <AlertDescription>
+            Connecting to Server, please wait...
+          </AlertDescription>
         </Alert>
       )}
 
@@ -517,8 +546,8 @@ function RecordPage() {
         <CardHeader>
           <CardTitle>Transcription</CardTitle>
           <CardDescription>
-            The transcribed text will appear below. You can also edit it manually before
-            generating notes.
+            The transcribed text will appear below. You can also edit it
+            manually before generating notes.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -555,19 +584,27 @@ function RecordPage() {
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                   <div className="md:col-span-2">
-                    <p className="font-medium text-muted-foreground mb-2">Doctor</p>
+                    <p className="font-medium text-muted-foreground mb-2">
+                      Doctor
+                    </p>
                     <p>
                       {String(doctorName)} ({String(doctorEmail)})
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium text-muted-foreground mb-2">Symptoms</p>
+                    <p className="font-medium text-muted-foreground mb-2">
+                      Symptoms
+                    </p>
                     <p>
-                      {entities.symptoms?.length ? entities.symptoms.join(", ") : "—"}
+                      {entities.symptoms?.length
+                        ? entities.symptoms.join(", ")
+                        : "—"}
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium text-muted-foreground mb-2">Medications</p>
+                    <p className="font-medium text-muted-foreground mb-2">
+                      Medications
+                    </p>
                     <p>
                       {entities.medications?.length
                         ? entities.medications.join(", ")
@@ -575,15 +612,23 @@ function RecordPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium text-muted-foreground mb-2">Diseases</p>
+                    <p className="font-medium text-muted-foreground mb-2">
+                      Diseases
+                    </p>
                     <p>
-                      {entities.diseases?.length ? entities.diseases.join(", ") : "—"}
+                      {entities.diseases?.length
+                        ? entities.diseases.join(", ")
+                        : "—"}
                     </p>
                   </div>
                   <div>
-                    <p className="font-medium text-muted-foreground mb-2">Procedures</p>
+                    <p className="font-medium text-muted-foreground mb-2">
+                      Procedures
+                    </p>
                     <p>
-                      {entities.procedures?.length ? entities.procedures.join(", ") : "—"}
+                      {entities.procedures?.length
+                        ? entities.procedures.join(", ")
+                        : "—"}
                     </p>
                   </div>
                   <div className="md:col-span-2">
@@ -614,7 +659,8 @@ function RecordPage() {
                 <CardHeader>
                   <CardTitle>SOAP Note</CardTitle>
                   <CardDescription>
-                    Generate a SOAP note from the transcription and optional image.
+                    Generate a SOAP note from the transcription and optional
+                    image.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -639,26 +685,42 @@ function RecordPage() {
                       )}
                       {soapNotes.subjective && (
                         <div>
-                          <p className="font-medium text-muted-foreground">Subjective</p>
-                          <p className="whitespace-pre-wrap">{soapNotes.subjective}</p>
+                          <p className="font-medium text-muted-foreground">
+                            Subjective
+                          </p>
+                          <p className="whitespace-pre-wrap">
+                            {soapNotes.subjective}
+                          </p>
                         </div>
                       )}
                       {soapNotes.objective && (
                         <div>
-                          <p className="font-medium text-muted-foreground">Objective</p>
-                          <p className="whitespace-pre-wrap">{soapNotes.objective}</p>
+                          <p className="font-medium text-muted-foreground">
+                            Objective
+                          </p>
+                          <p className="whitespace-pre-wrap">
+                            {soapNotes.objective}
+                          </p>
                         </div>
                       )}
                       {soapNotes.assessment && (
                         <div>
-                          <p className="font-medium text-muted-foreground">Assessment</p>
-                          <p className="whitespace-pre-wrap">{soapNotes.assessment}</p>
+                          <p className="font-medium text-muted-foreground">
+                            Assessment
+                          </p>
+                          <p className="whitespace-pre-wrap">
+                            {soapNotes.assessment}
+                          </p>
                         </div>
                       )}
                       {soapNotes.plan && (
                         <div>
-                          <p className="font-medium text-muted-foreground">Plan</p>
-                          <p className="whitespace-pre-wrap">{soapNotes.plan}</p>
+                          <p className="font-medium text-muted-foreground">
+                            Plan
+                          </p>
+                          <p className="whitespace-pre-wrap">
+                            {soapNotes.plan}
+                          </p>
                         </div>
                       )}
                       {!soapNotes.subjective &&
@@ -668,8 +730,8 @@ function RecordPage() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      Click &ldquo;Generate SOAP Notes&quot; to create a note from the
-                      transcription.
+                      Click &ldquo;Generate SOAP Notes&quot; to create a note
+                      from the transcription.
                     </p>
                   )}
                 </CardContent>
@@ -692,7 +754,9 @@ function RecordPage() {
                           }
                           const llmUrl = process.env.NEXT_PUBLIC_LLM_URL;
                           if (!llmUrl) {
-                            throw new Error("NEXT_PUBLIC_LLM_URL is not configured");
+                            throw new Error(
+                              "NEXT_PUBLIC_LLM_URL is not configured"
+                            );
                           }
                           const res = await fetch(llmUrl, {
                             method: "POST",
@@ -701,7 +765,8 @@ function RecordPage() {
                           const data = await res.json();
                           if (!res.ok) {
                             throw new Error(
-                              (data && (data as { message?: string }).message) ||
+                              (data &&
+                                (data as { message?: string }).message) ||
                                 `Request failed: ${res.status}`
                             );
                           }
@@ -753,7 +818,8 @@ function RecordPage() {
                                 body: JSON.stringify({ soap_notes: soapNotes }),
                               }
                             );
-                            const data: DifferentialResponse = await res.json();
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const data: any = await res.json();
                             if (!res.ok) {
                               throw new Error(
                                 (data && (data as { message?: string }).message) ||
@@ -761,7 +827,20 @@ function RecordPage() {
                               );
                             }
                             console.log("Differential response:", data);
-                            setdifferentials(data);
+                            // Store full DifferentialResponse so UI has all fields
+                            setdifferentials({
+                              primary_suspected_diagnosis: data.primary_suspected_diagnosis,
+                              differential_diagnoses: data.differential_diagnoses,
+                              additional_tests: data.additional_tests,
+                              red_flags: data.red_flags,
+                            });
+                            console.log("differentials:", {
+                              primary_suspected_diagnosis: data.primary_suspected_diagnosis,
+                              differential_diagnoses: data.differential_diagnoses,
+                              additional_tests: data.additional_tests,
+                              red_flags: data.red_flags,
+                            });
+                            // --- END OF FIX ---
                           } catch (err) {
                             console.error("Failed to get suggestions", err);
                             setError("Failed to get suggestions.");
@@ -789,12 +868,20 @@ function RecordPage() {
         <Card className="mt-4">
           <CardHeader>
             <CardTitle>AI Suggestions</CardTitle>
-            <CardDescription>Based on your generated SOAP notes</CardDescription>
+            <CardDescription>
+              Based on your generated SOAP notes
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {differentials.primary_suspected_diagnosis ? (
               <div>
-                <h4 className="text-sm font-medium">Primary suspected diagnosis</h4>
+                {(() => {
+                  console.log(differentials.primary_suspected_diagnosis);
+                  return null;
+                })()}
+                <h4 className="text-sm font-medium">
+                  Primary suspected diagnosis
+                </h4>
                 <p className="text-sm text-muted-foreground">
                   {differentials.primary_suspected_diagnosis}
                 </p>
@@ -809,9 +896,13 @@ function RecordPage() {
                   {differentials.differential_diagnoses.map((d, idx) => (
                     <div key={idx} className="rounded-md border p-3">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium">{d.diagnosis || "—"}</span>
+                        <span className="font-medium">
+                          {d.diagnosis || "—"}
+                        </span>
                         {d.likelihood && (
-                          <span className="text-xs text-muted-foreground">{d.likelihood}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {d.likelihood}
+                          </span>
                         )}
                       </div>
                       {d.reasoning && (
@@ -842,7 +933,8 @@ function RecordPage() {
               </div>
             ) : null}
 
-            {Array.isArray(differentials.red_flags) && differentials.red_flags.length > 0 ? (
+            {Array.isArray(differentials.red_flags) &&
+            differentials.red_flags.length > 0 ? (
               <div>
                 <h4 className="text-sm font-medium text-red-600">Red flags</h4>
                 <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
@@ -858,11 +950,7 @@ function RecordPage() {
 
       {/* Download button (uses both soapNotes and differentials if present) */}
       <div className="flex justify-end mt-6">
-        <Button
-          onClick={downloadPrescriptionPDF}
-          className="ml-2"
-          size="lg"
-        >
+        <Button onClick={downloadPrescriptionPDF} className="ml-2" size="lg">
           Download Prescription (PDF)
         </Button>
       </div>
